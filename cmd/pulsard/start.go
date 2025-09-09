@@ -33,7 +33,7 @@ func startCmd() *cobra.Command {
 func startNode(homeDir string) error {
 	config := cfg.DefaultConfig()
 	config.SetRoot(homeDir)
-	
+
 	configFile := filepath.Join(homeDir, "config", "config.toml")
 	if _, err := os.Stat(configFile); err == nil {
 		viper := cfg.DefaultConfig()
@@ -56,7 +56,7 @@ func startNode(homeDir string) error {
 
 	server := abciserver.NewSocketServer("tcp://127.0.0.1:26658", app)
 	server.SetLogger(logger.With("module", "abci-server"))
-	
+
 	if err := server.Start(); err != nil {
 		return fmt.Errorf("failed to start ABCI server: %w", err)
 	}

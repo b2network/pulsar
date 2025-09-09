@@ -21,7 +21,7 @@ func initCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			moniker := args[0]
 			homeDir, _ := cmd.Flags().GetString("home")
-			
+
 			return initNode(homeDir, moniker)
 		},
 	}
@@ -44,12 +44,12 @@ func initNode(homeDir, moniker string) error {
 	cfg.ProxyApp = "tcp://127.0.0.1:26658"
 	cfg.RPC.ListenAddress = "tcp://127.0.0.1:26657"
 	cfg.P2P.ListenAddress = "tcp://0.0.0.0:26656"
-	
+
 	config.WriteConfigFile(filepath.Join(configDir, "config.toml"), cfg)
 
 	pvKeyFile := filepath.Join(configDir, "priv_validator_key.json")
 	pvStateFile := filepath.Join(dataDir, "priv_validator_state.json")
-	
+
 	pv := privval.GenFilePV(pvKeyFile, pvStateFile)
 	pv.Save()
 
@@ -85,6 +85,6 @@ func initNode(homeDir, moniker string) error {
 	fmt.Printf("  Home directory: %s\n", homeDir)
 	fmt.Printf("  Node ID: %s\n", nodeKey.ID())
 	fmt.Printf("  Validator pubkey: %s\n", pubKey)
-	
+
 	return nil
 }

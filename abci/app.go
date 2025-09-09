@@ -11,15 +11,15 @@ import (
 )
 
 type PulsarApp struct {
-	db           dbm.DB
-	logger       log.Logger
-	state        State
+	db              dbm.DB
+	logger          log.Logger
+	state           State
 	lastBlockHeight int64
 }
 
 type State struct {
-	Height int64             `json:"height"`
-	AppHash []byte           `json:"app_hash"`
+	Height  int64             `json:"height"`
+	AppHash []byte            `json:"app_hash"`
 	Data    map[string][]byte `json:"data"`
 }
 
@@ -46,8 +46,8 @@ func (app *PulsarApp) Info(_ context.Context, req *abci.RequestInfo) (*abci.Resp
 func (app *PulsarApp) Query(_ context.Context, req *abci.RequestQuery) (*abci.ResponseQuery, error) {
 	if value, exists := app.state.Data[string(req.Data)]; exists {
 		return &abci.ResponseQuery{
-			Key:   req.Data,
-			Value: value,
+			Key:    req.Data,
+			Value:  value,
 			Height: app.state.Height,
 		}, nil
 	}
@@ -79,7 +79,7 @@ func (app *PulsarApp) ProcessProposal(_ context.Context, req *abci.RequestProces
 
 func (app *PulsarApp) FinalizeBlock(_ context.Context, req *abci.RequestFinalizeBlock) (*abci.ResponseFinalizeBlock, error) {
 	app.state.Height = req.Height
-	
+
 	txResults := make([]*abci.ExecTxResult, len(req.Txs))
 	for i, tx := range req.Txs {
 		var txData map[string]string
