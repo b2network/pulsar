@@ -2,6 +2,7 @@ package types
 
 import (
 	keepertypes "github.com/b2network/pulsar/keeper/types"
+	stakingtypes "github.com/b2network/pulsar/modules/staking/types"
 )
 
 // ModuleName is the name of the governance module
@@ -205,7 +206,7 @@ type BankKeeper interface {
 
 // StakingKeeper defines expected interface for staking keeper
 type StakingKeeper interface {
-	GetBondedValidatorsByPower(ctx keepertypes.Context) []interface{} // Simplified interface
+	GetBondedValidatorsByPower(ctx keepertypes.Context) []stakingtypes.Validator
 	GetLastTotalPower(ctx keepertypes.Context) int64
 }
 

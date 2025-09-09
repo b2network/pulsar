@@ -161,6 +161,76 @@ func (b *Backend) Close() error {
 	return nil
 }
 
+// ApplyChangeset applies a changeset at the given version
+func (b *Backend) ApplyChangeset(version int64, cs *types.ChangeSet) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Apply the changeset operations
+	for _, change := range cs.Pairs {
+		keyStr := string(change.Key)
+		if change.Delete {
+			if b.deletions[keyStr] == nil {
+				b.deletions[keyStr] = make(map[int64]bool)
+			}
+			b.deletions[keyStr][version] = true
+		} else {
+			if b.data[keyStr] == nil {
+				b.data[keyStr] = make(map[int64][]byte)
+			}
+			b.data[keyStr][version] = change.Value
+		}
+	}
+
+	// Update latest version
+	if version > b.latestVersion {
+		b.latestVersion = version
+	}
+
+	return nil
+}
+
+// StateStorageAdapter wraps Backend to implement StateStorage interface
+type StateStorageAdapter struct {
+	*Backend
+}
+
+// NewStateStorageAdapter creates a new adapter
+func NewStateStorageAdapter(backend *Backend) *StateStorageAdapter {
+	return &StateStorageAdapter{Backend: backend}
+}
+
+// StateStorage interface methods with StoreKey parameter
+func (a *StateStorageAdapter) Get(storeKey types.StoreKey, key []byte, version int64) ([]byte, error) {
+	// For simplicity, ignore storeKey for now
+	return a.Backend.Get(key, version)
+}
+
+func (a *StateStorageAdapter) Set(storeKey types.StoreKey, key, value []byte) {
+	// For simplicity, ignore storeKey for now
+	a.Backend.Set(key, value)
+}
+
+func (a *StateStorageAdapter) Delete(storeKey types.StoreKey, key []byte) {
+	// For simplicity, ignore storeKey for now
+	a.Backend.Delete(key)
+}
+
+func (a *StateStorageAdapter) Has(storeKey types.StoreKey, key []byte, version int64) (bool, error) {
+	// For simplicity, ignore storeKey for now
+	return a.Backend.Has(key, version)
+}
+
+func (a *StateStorageAdapter) Iterator(storeKey types.StoreKey, start, end []byte, version int64) (types.Iterator, error) {
+	// For simplicity, ignore storeKey for now
+	return a.Backend.Iterator(start, end, version)
+}
+
+func (a *StateStorageAdapter) ReverseIterator(storeKey types.StoreKey, start, end []byte, version int64) (types.Iterator, error) {
+	// For simplicity, ignore storeKey for now
+	return a.Backend.ReverseIterator(start, end, version)
+}
+
 // memoryIterator implements Iterator for the memory backend
 type memoryIterator struct {
 	backend *Backend

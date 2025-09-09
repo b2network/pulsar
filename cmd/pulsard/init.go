@@ -1,11 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	banktypes "github.com/b2network/pulsar/modules/bank/types"
+	govtypes "github.com/b2network/pulsar/modules/gov/types"
+	stakingtypes "github.com/b2network/pulsar/modules/staking/types"
 	"github.com/cometbft/cometbft/config"
 	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/privval"
@@ -64,10 +68,43 @@ func initNode(homeDir, moniker string) error {
 		return fmt.Errorf("failed to get public key: %w", err)
 	}
 
+	// Create application genesis state
+	appState := make(map[string]json.RawMessage)
+	
+	// Bank module genesis
+	bankGenesis := banktypes.DefaultGenesisState()
+	bankGenesisBytes, err := json.Marshal(bankGenesis)
+	if err != nil {
+		return fmt.Errorf("failed to marshal bank genesis: %w", err)
+	}
+	appState[banktypes.ModuleName] = bankGenesisBytes
+	
+	// Staking module genesis
+	stakingGenesis := stakingtypes.DefaultGenesisState()
+	stakingGenesisBytes, err := json.Marshal(stakingGenesis)
+	if err != nil {
+		return fmt.Errorf("failed to marshal staking genesis: %w", err)
+	}
+	appState[stakingtypes.ModuleName] = stakingGenesisBytes
+	
+	// Gov module genesis
+	govGenesis := govtypes.DefaultGenesisState()
+	govGenesisBytes, err := json.Marshal(govGenesis)
+	if err != nil {
+		return fmt.Errorf("failed to marshal gov genesis: %w", err)
+	}
+	appState[govtypes.ModuleName] = govGenesisBytes
+	
+	appStateBytes, err := json.Marshal(appState)
+	if err != nil {
+		return fmt.Errorf("failed to marshal app state: %w", err)
+	}
+
 	genDoc := &types.GenesisDoc{
 		ChainID:         "pulsar-1",
 		GenesisTime:     time.Now(),
 		ConsensusParams: types.DefaultConsensusParams(),
+		AppState:        appStateBytes,
 		Validators: []types.GenesisValidator{
 			{
 				Address: pubKey.Address(),

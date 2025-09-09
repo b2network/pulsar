@@ -237,3 +237,38 @@ func (iter *mockTreeIterator) isInDomain(key []byte) bool {
 	}
 	return true
 }
+
+// MockTreeBackend implements StateCommitment for testing
+type MockTreeBackend struct {
+	trees map[string]*MockTree
+}
+
+// NewMockTreeBackend creates a new mock tree backend
+func NewMockTreeBackend() *MockTreeBackend {
+	return &MockTreeBackend{
+		trees: make(map[string]*MockTree),
+	}
+}
+
+func (b *MockTreeBackend) WriteChangeset(cs *types.ChangeSet) error {
+	return nil
+}
+
+func (b *MockTreeBackend) GetCommitInfo(version int64) (*types.CommitInfo, error) {
+	return &types.CommitInfo{
+		Version:    version,
+		StoreInfos: nil,
+	}, nil
+}
+
+func (b *MockTreeBackend) GetProof(storeKey types.StoreKey, version int64, key []byte) (*types.Proof, error) {
+	return &types.Proof{}, nil
+}
+
+func (b *MockTreeBackend) Commit(version int64) ([]byte, error) {
+	return []byte("mock-hash"), nil
+}
+
+func (b *MockTreeBackend) GetLatestVersion() (int64, error) {
+	return 1, nil
+}

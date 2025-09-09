@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/b2network/pulsar/abci"
+	"github.com/b2network/pulsar/app"
 	abciserver "github.com/cometbft/cometbft/abci/server"
 	cfg "github.com/cometbft/cometbft/config"
 	"github.com/cometbft/cometbft/libs/log"
@@ -15,7 +15,6 @@ import (
 	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/privval"
 	"github.com/cometbft/cometbft/proxy"
-	dbm "github.com/cosmos/cosmos-db"
 	"github.com/spf13/cobra"
 )
 
@@ -46,15 +45,10 @@ func startNode(homeDir string) error {
 
 	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
-	db, err := dbm.NewDB("pulsar", dbm.GoLevelDBBackend, filepath.Join(homeDir, "data"))
-	if err != nil {
-		return fmt.Errorf("failed to open database: %w", err)
-	}
-	defer db.Close()
+	// Create Pulsar application
+	pulsarApp := app.NewPulsarApp(logger, homeDir)
 
-	app := abci.NewPulsarApp(db, logger)
-
-	server := abciserver.NewSocketServer("tcp://127.0.0.1:26658", app)
+	server := abciserver.NewSocketServer("tcp://127.0.0.1:26658", pulsarApp)
 	server.SetLogger(logger.With("module", "abci-server"))
 
 	if err := server.Start(); err != nil {
@@ -76,7 +70,7 @@ func startNode(homeDir string) error {
 		config,
 		pv,
 		nodeKey,
-		proxy.NewLocalClientCreator(app),
+		proxy.NewLocalClientCreator(pulsarApp),
 		nm.DefaultGenesisDocProviderFunc(config),
 		cfg.DefaultDBProvider,
 		nm.DefaultMetricsProvider(config.Instrumentation),
