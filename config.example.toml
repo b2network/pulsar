@@ -1,0 +1,102 @@
+# Pulsar Node Configuration Example
+
+# Chain ID
+chain_id = "pulsar-1"
+
+# Node moniker
+moniker = "my-node"
+
+# Database backend: goleveldb | cleveldb | boltdb | rocksdb | badgerdb
+db_backend = "goleveldb"
+
+# Database directory
+db_dir = "data"
+
+# Log level: debug | info | warn | error | fatal
+log_level = "info"
+
+# Log format: plain | json
+log_format = "plain"
+
+#######################################################
+###                 RPC Configuration               ###
+#######################################################
+[rpc]
+# TCP or UNIX socket address for the RPC server to listen on
+laddr = "tcp://127.0.0.1:26657"
+
+# CORS allowed origins, use * for all
+cors_allowed_origins = []
+
+# Maximum number of simultaneous connections
+max_open_connections = 900
+
+#######################################################
+###                P2P Configuration                ###
+#######################################################
+[p2p]
+# Address to listen for incoming connections
+laddr = "tcp://0.0.0.0:26656"
+
+# Comma separated list of seed nodes
+seeds = ""
+
+# Comma separated list of persistent peers
+persistent_peers = ""
+
+# Maximum number of inbound peers
+max_num_inbound_peers = 40
+
+# Maximum number of outbound peers
+max_num_outbound_peers = 10
+
+#######################################################
+###             Consensus Configuration             ###
+#######################################################
+[consensus]
+# How long to wait for a proposal block before prevoting nil
+timeout_propose = "3s"
+
+# How long after receiving +2/3 prevotes for anything before prevoting nil
+timeout_prevote = "1s"
+
+# How long after receiving +2/3 precommits before entering commit
+timeout_precommit = "1s"
+
+# How long to wait after committing a block before starting new round
+timeout_commit = "5s"
+
+#######################################################
+###             Mempool Configuration               ###
+#######################################################
+[mempool]
+# Mempool version to use (v0 | v1)
+version = "v1"
+
+# Maximum number of transactions in the mempool
+size = 5000
+
+# Maximum size of a single transaction
+max_tx_bytes = 1048576
+
+# Maximum size of all transactions in the mempool
+max_txs_bytes = 1073741824
+
+#######################################################
+###          State Sync Configuration              ###
+#######################################################
+[statesync]
+# Enable state sync
+enable = false
+
+# RPC servers for state sync
+rpc_servers = ""
+
+# Trust height
+trust_height = 0
+
+# Trust hash
+trust_hash = ""
+
+# Trust period
+trust_period = "168h0m0s"
