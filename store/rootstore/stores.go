@@ -9,10 +9,10 @@ import (
 
 // iavlStore implements a CommitKVStore backed by IAVL
 type iavlStore struct {
-	key    types.StoreKey
-	db     types.DB
-	root   *Store
-	
+	key  types.StoreKey
+	db   types.DB
+	root *Store
+
 	// IAVL-specific fields would go here
 	// tree *iavl.MutableTree
 }

@@ -15,7 +15,7 @@ type bufferIterator struct {
 	start       []byte
 	end         []byte
 	reverse     bool
-	
+
 	// Merged iteration state
 	allKeys     []string
 	keyIndex    int
@@ -60,16 +60,16 @@ func (iter *bufferIterator) Value() []byte {
 	if !iter.Valid() {
 		return nil
 	}
-	
+
 	key := iter.allKeys[iter.keyIndex]
-	
+
 	// Check buffer first
 	if iter.buffer != nil {
 		if value, exists := iter.buffer.sets[key]; exists {
 			return value
 		}
 	}
-	
+
 	// This is a simplified implementation - in practice we'd need to
 	// maintain a mapping from keys to their backend values
 	return nil
@@ -86,9 +86,9 @@ func (iter *bufferIterator) ensureInitialized() {
 	if iter.initialized {
 		return
 	}
-	
+
 	keySet := make(map[string]bool)
-	
+
 	// Add keys from backend iterator
 	if iter.backend != nil {
 		for ; iter.backend.Valid(); iter.backend.Next() {
@@ -100,7 +100,7 @@ func (iter *bufferIterator) ensureInitialized() {
 			}
 		}
 	}
-	
+
 	// Add/remove keys from buffer
 	if iter.buffer != nil {
 		// Add buffered sets
@@ -110,28 +110,28 @@ func (iter *bufferIterator) ensureInitialized() {
 				keySet[key] = true
 			}
 		}
-		
+
 		// Remove buffered deletes
 		for key := range iter.buffer.deletes {
 			delete(keySet, key)
 		}
 	}
-	
+
 	// Convert to sorted slice
 	iter.allKeys = make([]string, 0, len(keySet))
 	for key := range keySet {
 		iter.allKeys = append(iter.allKeys, key)
 	}
-	
+
 	sort.Strings(iter.allKeys)
-	
+
 	if iter.reverse {
 		// Reverse the slice
 		for i, j := 0, len(iter.allKeys)-1; i < j; i, j = i+1, j-1 {
 			iter.allKeys[i], iter.allKeys[j] = iter.allKeys[j], iter.allKeys[i]
 		}
 	}
-	
+
 	iter.initialized = true
 }
 
@@ -148,7 +148,7 @@ func (iter *bufferIterator) isInDomain(key []byte) bool {
 func (iter *bufferIterator) removePrefix(key []byte) []byte {
 	prefix := iter.storePrefix + "/"
 	prefixBytes := []byte(prefix)
-	
+
 	if bytes.HasPrefix(key, prefixBytes) {
 		return key[len(prefixBytes):]
 	}

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/linxGnu/grocksdb"
 	"github.com/b2network/pulsar/store/storage"
 	"github.com/b2network/pulsar/store/types"
+	"github.com/linxGnu/grocksdb"
 )
 
 // Backend implements a RocksDB-based storage backend with versioning
@@ -16,28 +16,28 @@ type Backend struct {
 	options   *grocksdb.Options
 	writeOpts *grocksdb.WriteOptions
 	readOpts  *grocksdb.ReadOptions
-	
+
 	// Versioning support using column families
 	defaultCF *grocksdb.ColumnFamilyHandle
 	versionCF *grocksdb.ColumnFamilyHandle
-	
+
 	// Write batch for atomic operations
 	batch *grocksdb.WriteBatch
-	
+
 	// Latest version tracking
 	latestVersion int64
 }
 
 // Config defines configuration for RocksDB backend
 type Config struct {
-	DataDir     string
+	DataDir         string
 	CreateIfMissing bool
-	
+
 	// Performance tuning
-	MaxOpenFiles        int
-	WriteBufferSize     int
-	MaxWriteBufferNum   int
-	MinWriteBufferNum   int
+	MaxOpenFiles                   int
+	WriteBufferSize                int
+	MaxWriteBufferNum              int
+	MinWriteBufferNum              int
 	Level0FileNumCompactionTrigger int
 	Level0SlowdownWritesTrigger    int
 	Level0StopWritesTrigger        int
@@ -45,7 +45,7 @@ type Config struct {
 	MaxBytesForLevelMultiplier     float64
 	TargetFileSizeBase             uint64
 	TargetFileSizeMultiplier       int
-	
+
 	// Block cache
 	BlockCacheSize int64
 }
@@ -55,20 +55,20 @@ func DefaultConfig(dataDir string) *Config {
 	return &Config{
 		DataDir:         dataDir,
 		CreateIfMissing: true,
-		
+
 		// Performance settings optimized for blockchain workloads
-		MaxOpenFiles:        1000,
-		WriteBufferSize:     64 << 20,  // 64MB
-		MaxWriteBufferNum:   3,
-		MinWriteBufferNum:   2,
+		MaxOpenFiles:                   1000,
+		WriteBufferSize:                64 << 20, // 64MB
+		MaxWriteBufferNum:              3,
+		MinWriteBufferNum:              2,
 		Level0FileNumCompactionTrigger: 4,
 		Level0SlowdownWritesTrigger:    20,
 		Level0StopWritesTrigger:        36,
 		MaxBytesForLevelBase:           256 << 20, // 256MB
 		MaxBytesForLevelMultiplier:     10,
-		TargetFileSizeBase:             64 << 20,  // 64MB
+		TargetFileSizeBase:             64 << 20, // 64MB
 		TargetFileSizeMultiplier:       2,
-		
+
 		BlockCacheSize: 128 << 20, // 128MB
 	}
 }
@@ -77,12 +77,12 @@ func DefaultConfig(dataDir string) *Config {
 func NewBackend(config *Config) (*Backend, error) {
 	// Ensure data directory exists
 	dataDir := filepath.Clean(config.DataDir)
-	
+
 	// Configure RocksDB options
 	options := grocksdb.NewDefaultOptions()
 	options.SetCreateIfMissing(config.CreateIfMissing)
 	options.SetCreateIfMissingColumnFamilies(true)
-	
+
 	// Performance tuning
 	options.SetMaxOpenFiles(config.MaxOpenFiles)
 	options.SetWriteBufferSize(config.WriteBufferSize)
@@ -95,37 +95,37 @@ func NewBackend(config *Config) (*Backend, error) {
 	options.SetMaxBytesForLevelMultiplier(config.MaxBytesForLevelMultiplier)
 	options.SetTargetFileSizeBase(config.TargetFileSizeBase)
 	options.SetTargetFileSizeMultiplier(config.TargetFileSizeMultiplier)
-	
+
 	// Block cache for better read performance
 	blockCache := grocksdb.NewLRUCache(config.BlockCacheSize)
 	blockBasedTableOptions := grocksdb.NewDefaultBlockBasedTableOptions()
 	blockBasedTableOptions.SetBlockCache(blockCache)
 	options.SetBlockBasedTableFactory(blockBasedTableOptions)
-	
+
 	// Use LZ4 compression for better performance
 	options.SetCompression(grocksdb.LZ4Compression)
-	
+
 	// Column family setup for versioning
 	cfNames := []string{"default", "versions"}
 	cfOpts := []*grocksdb.Options{options, options}
-	
+
 	db, cfHandles, err := grocksdb.OpenDbColumnFamilies(options, dataDir, cfNames, cfOpts)
 	if err != nil {
 		options.Destroy()
 		return nil, fmt.Errorf("failed to open RocksDB: %w", err)
 	}
-	
+
 	if len(cfHandles) != 2 {
 		db.Close()
 		options.Destroy()
 		return nil, fmt.Errorf("expected 2 column families, got %d", len(cfHandles))
 	}
-	
+
 	writeOpts := grocksdb.NewDefaultWriteOptions()
 	writeOpts.SetSync(false) // Async writes for better performance
-	
+
 	readOpts := grocksdb.NewDefaultReadOptions()
-	
+
 	backend := &Backend{
 		db:        db,
 		options:   options,
@@ -135,30 +135,30 @@ func NewBackend(config *Config) (*Backend, error) {
 		versionCF: cfHandles[1],
 		batch:     grocksdb.NewWriteBatch(),
 	}
-	
+
 	// Load latest version
 	if err := backend.loadLatestVersion(); err != nil {
 		backend.Close()
 		return nil, fmt.Errorf("failed to load latest version: %w", err)
 	}
-	
+
 	return backend, nil
 }
 
 // Get retrieves a value by key and version
 func (b *Backend) Get(key []byte, version int64) ([]byte, error) {
 	versionedKey := b.makeVersionedKey(key, version)
-	
+
 	value, err := b.db.GetCF(b.readOpts, b.defaultCF, versionedKey)
 	if err != nil {
 		return nil, err
 	}
 	defer value.Free()
-	
+
 	if !value.Exists() {
 		return nil, nil
 	}
-	
+
 	return value.Data(), nil
 }
 
@@ -177,13 +177,13 @@ func (b *Backend) Delete(key []byte) {
 // Has checks if a key exists at the given version
 func (b *Backend) Has(key []byte, version int64) (bool, error) {
 	versionedKey := b.makeVersionedKey(key, version)
-	
+
 	value, err := b.db.GetCF(b.readOpts, b.defaultCF, versionedKey)
 	if err != nil {
 		return false, err
 	}
 	defer value.Free()
-	
+
 	return value.Exists(), nil
 }
 
@@ -191,7 +191,7 @@ func (b *Backend) Has(key []byte, version int64) (bool, error) {
 func (b *Backend) Iterator(start, end []byte, version int64) (types.Iterator, error) {
 	startKey := b.makeVersionedKey(start, version)
 	endKey := b.makeVersionedKey(end, version)
-	
+
 	iter := b.db.NewIteratorCF(b.readOpts, b.defaultCF)
 	return newRocksDBIterator(iter, startKey, endKey, b.keyLength()), nil
 }
@@ -200,7 +200,7 @@ func (b *Backend) Iterator(start, end []byte, version int64) (types.Iterator, er
 func (b *Backend) ReverseIterator(start, end []byte, version int64) (types.Iterator, error) {
 	startKey := b.makeVersionedKey(start, version)
 	endKey := b.makeVersionedKey(end, version)
-	
+
 	iter := b.db.NewIteratorCF(b.readOpts, b.defaultCF)
 	return newRocksDBReverseIterator(iter, startKey, endKey, b.keyLength()), nil
 }
@@ -211,18 +211,18 @@ func (b *Backend) Flush(version int64) error {
 	versionKey := []byte("latest_version")
 	versionValue := make([]byte, 8)
 	binary.BigEndian.PutUint64(versionValue, uint64(version))
-	
+
 	b.batch.PutCF(b.versionCF, versionKey, versionValue)
-	
+
 	// Write batch atomically
 	if err := b.db.Write(b.writeOpts, b.batch); err != nil {
 		return fmt.Errorf("failed to write batch: %w", err)
 	}
-	
+
 	// Clear batch for next use
 	b.batch.Clear()
 	b.latestVersion = version
-	
+
 	return nil
 }
 
@@ -237,59 +237,59 @@ func (b *Backend) Close() error {
 		b.batch.Destroy()
 		b.batch = nil
 	}
-	
+
 	if b.defaultCF != nil {
 		b.defaultCF.Destroy()
 		b.defaultCF = nil
 	}
-	
+
 	if b.versionCF != nil {
 		b.versionCF.Destroy()
 		b.versionCF = nil
 	}
-	
+
 	if b.readOpts != nil {
 		b.readOpts.Destroy()
 		b.readOpts = nil
 	}
-	
+
 	if b.writeOpts != nil {
 		b.writeOpts.Destroy()
 		b.writeOpts = nil
 	}
-	
+
 	if b.db != nil {
 		b.db.Close()
 		b.db = nil
 	}
-	
+
 	if b.options != nil {
 		b.options.Destroy()
 		b.options = nil
 	}
-	
+
 	return nil
 }
 
 func (b *Backend) loadLatestVersion() error {
 	versionKey := []byte("latest_version")
-	
+
 	value, err := b.db.GetCF(b.readOpts, b.versionCF, versionKey)
 	if err != nil {
 		return err
 	}
 	defer value.Free()
-	
+
 	if !value.Exists() {
 		b.latestVersion = 0
 		return nil
 	}
-	
+
 	data := value.Data()
 	if len(data) != 8 {
 		return fmt.Errorf("invalid version data length: %d", len(data))
 	}
-	
+
 	b.latestVersion = int64(binary.BigEndian.Uint64(data))
 	return nil
 }
@@ -299,14 +299,14 @@ func (b *Backend) makeVersionedKey(key []byte, version int64) []byte {
 	if key == nil {
 		return nil
 	}
-	
+
 	versionBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(versionBytes, uint64(version))
-	
+
 	versionedKey := make([]byte, len(key)+8)
 	copy(versionedKey, key)
 	copy(versionedKey[len(key):], versionBytes)
-	
+
 	return versionedKey
 }
 

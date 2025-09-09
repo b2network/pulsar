@@ -9,11 +9,11 @@ import (
 
 // cacheKVStore implements a cache wrapper around a KVStore
 type cacheKVStore struct {
-	parent   types.KVStore
-	cache    map[string]cacheValue
-	deleted  map[string]bool
+	parent     types.KVStore
+	cache      map[string]cacheValue
+	deleted    map[string]bool
 	sortedKeys []string
-	dirty    bool
+	dirty      bool
 }
 
 type cacheValue struct {
@@ -40,23 +40,23 @@ func (s *cacheKVStore) CacheWrap() types.CacheWrap {
 
 func (s *cacheKVStore) Get(key []byte) []byte {
 	keyStr := string(key)
-	
+
 	// Check if deleted
 	if s.deleted[keyStr] {
 		return nil
 	}
-	
+
 	// Check cache first
 	if cached, exists := s.cache[keyStr]; exists {
 		return cached.value
 	}
-	
+
 	// Get from parent
 	value := s.parent.Get(key)
-	
+
 	// Cache the result
 	s.cache[keyStr] = cacheValue{value: value, dirty: false}
-	
+
 	return value
 }
 
@@ -91,14 +91,14 @@ func (s *cacheKVStore) ReverseIterator(start, end []byte) types.Iterator {
 func (s *cacheKVStore) iterator(start, end []byte, reverse bool) types.Iterator {
 	// This is a simplified implementation
 	// A full implementation would merge parent iterator with cache changes
-	
+
 	// Get all keys from cache and parent
 	allKeys := make(map[string][]byte)
-	
+
 	// Add parent keys
 	parentIter := s.parent.Iterator(start, end)
 	defer parentIter.Close()
-	
+
 	for ; parentIter.Valid(); parentIter.Next() {
 		key := string(parentIter.Key())
 		if !s.deleted[key] {
@@ -109,7 +109,7 @@ func (s *cacheKVStore) iterator(start, end []byte, reverse bool) types.Iterator 
 			}
 		}
 	}
-	
+
 	// Add cache-only keys
 	for keyStr, cached := range s.cache {
 		key := []byte(keyStr)
@@ -117,7 +117,7 @@ func (s *cacheKVStore) iterator(start, end []byte, reverse bool) types.Iterator 
 			allKeys[keyStr] = cached.value
 		}
 	}
-	
+
 	return newMapIterator(allKeys, start, end, reverse)
 }
 
@@ -125,19 +125,19 @@ func (s *cacheKVStore) Write() {
 	if !s.dirty {
 		return
 	}
-	
+
 	// Write cached changes to parent
 	for keyStr, cached := range s.cache {
 		if cached.dirty {
 			s.parent.Set([]byte(keyStr), cached.value)
 		}
 	}
-	
+
 	// Apply deletions
 	for keyStr := range s.deleted {
 		s.parent.Delete([]byte(keyStr))
 	}
-	
+
 	// Clear cache
 	s.cache = make(map[string]cacheValue)
 	s.deleted = make(map[string]bool)
@@ -178,12 +178,12 @@ func (s *cacheMultiStore) GetStore(key types.StoreKey) types.Store {
 	if cached, exists := s.stores[key]; exists {
 		return cached.(types.Store)
 	}
-	
+
 	store := s.parent.GetStore(key)
 	if store == nil {
 		return nil
 	}
-	
+
 	cached := store.CacheWrap()
 	s.stores[key] = cached
 	return cached.(types.Store)
@@ -226,7 +226,7 @@ func newMapIterator(data map[string][]byte, start, end []byte, reverse bool) typ
 		reverse: reverse,
 		index:   0,
 	}
-	
+
 	// Filter and sort keys
 	for keyStr := range data {
 		key := []byte(keyStr)
@@ -234,7 +234,7 @@ func newMapIterator(data map[string][]byte, start, end []byte, reverse bool) typ
 			iter.keys = append(iter.keys, keyStr)
 		}
 	}
-	
+
 	sort.Strings(iter.keys)
 	if reverse {
 		// Reverse the slice
@@ -242,7 +242,7 @@ func newMapIterator(data map[string][]byte, start, end []byte, reverse bool) typ
 			iter.keys[i], iter.keys[j] = iter.keys[j], iter.keys[i]
 		}
 	}
-	
+
 	return iter
 }
 

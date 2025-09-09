@@ -56,8 +56,8 @@ func ExampleUsage(dataDir string) error {
 	// 7. Create pruning manager
 	pruningConfig := pruning.Config{
 		Options:         types.NewPruningOptions(types.PruningDefault),
-		StateStorage:    &mockPruner{},    // Implementation not shown
-		StateCommitment: &mockPruner{},    // Implementation not shown
+		StateStorage:    &mockPruner{}, // Implementation not shown
+		StateCommitment: &mockPruner{}, // Implementation not shown
 	}
 	pruningManager := pruning.NewManager(pruningConfig)
 	pruningManager.Start()
@@ -65,7 +65,7 @@ func ExampleUsage(dataDir string) error {
 
 	// 8. Use the stores
 	bankStore := rootStore.GetKVStore(bankKey)
-	
+
 	// Example: Store balance
 	bankStore.Set([]byte("alice"), []byte("1000"))
 	bankStore.Set([]byte("bob"), []byte("500"))
@@ -101,7 +101,7 @@ func ExampleUsage(dataDir string) error {
 	gasMeter := &mockGasMeter{limit: 1000000, consumed: 0}
 	gasConfig := kvstore.DefaultGasConfig()
 	gasStore := kvstore.NewGasKVStore(bankStore, gasMeter, gasConfig)
-	
+
 	// This will consume gas
 	gasStore.Get([]byte("alice"))
 	fmt.Printf("Gas consumed: %d\n", gasMeter.GasConsumed())

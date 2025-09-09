@@ -57,7 +57,7 @@ func (s *PrefixStore) Delete(key []byte) {
 func (s *PrefixStore) Iterator(start, end []byte) types.Iterator {
 	prefixedStart := s.prefixKey(start)
 	prefixedEnd := s.prefixKey(end)
-	
+
 	parentIter := s.parent.Iterator(prefixedStart, prefixedEnd)
 	return newPrefixIterator(parentIter, s.prefix, start, end)
 }
@@ -65,7 +65,7 @@ func (s *PrefixStore) Iterator(start, end []byte) types.Iterator {
 func (s *PrefixStore) ReverseIterator(start, end []byte) types.Iterator {
 	prefixedStart := s.prefixKey(start)
 	prefixedEnd := s.prefixKey(end)
-	
+
 	parentIter := s.parent.ReverseIterator(prefixedStart, prefixedEnd)
 	return newPrefixIterator(parentIter, s.prefix, start, end)
 }
@@ -105,7 +105,7 @@ func (iter *prefixIterator) Valid() bool {
 	if !iter.parent.Valid() {
 		return false
 	}
-	
+
 	// Check if the key still has our prefix
 	key := iter.parent.Key()
 	return bytes.HasPrefix(key, iter.prefix)
@@ -119,12 +119,12 @@ func (iter *prefixIterator) Key() []byte {
 	if !iter.Valid() {
 		return nil
 	}
-	
+
 	key := iter.parent.Key()
 	if !bytes.HasPrefix(key, iter.prefix) {
 		return nil
 	}
-	
+
 	return key[len(iter.prefix):]
 }
 

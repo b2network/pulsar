@@ -51,7 +51,7 @@ func (cid CommitID) String() string {
 
 // CommitInfo defines commit information used by the multi-store when committing a version
 type CommitInfo struct {
-	Version    int64      `json:"version"`
+	Version    int64       `json:"version"`
 	StoreInfos []StoreInfo `json:"store_infos"`
 }
 
@@ -68,9 +68,9 @@ type ChangeSet struct {
 
 // KVPair defines a key-value pair with operation type
 type KVPair struct {
-	Key      []byte `json:"key"`
-	Value    []byte `json:"value"`
-	Delete   bool   `json:"delete"`
+	Key    []byte `json:"key"`
+	Value  []byte `json:"value"`
+	Delete bool   `json:"delete"`
 }
 
 // Iterator defines an interface for iterating over key-value pairs
@@ -161,11 +161,11 @@ type MultiStore interface {
 type CommitMultiStore interface {
 	Committer
 	MultiStore
-	
+
 	MountStoreWithDB(key StoreKey, typ StoreType, db DB)
 	LoadLatestVersion() error
 	LoadVersion(ver int64) error
-	
+
 	GetCommitKVStore(key StoreKey) CommitKVStore
 	GetCommitStore(key StoreKey) CommitStore
 }
@@ -179,10 +179,10 @@ type CacheMultiStore interface {
 // RootStore defines the root store interface for Pulsar
 type RootStore interface {
 	CommitMultiStore
-	
+
 	GetStateStorage() StateStorage
 	GetStateCommitment() StateCommitment
-	
+
 	Query(storeKey StoreKey, version int64, key []byte, prove bool) (QueryResult, error)
 	SetInitialVersion(version int64)
 }
@@ -193,10 +193,10 @@ type StateStorage interface {
 	Set(storeKey StoreKey, key, value []byte)
 	Delete(storeKey StoreKey, key []byte)
 	Has(storeKey StoreKey, key []byte, version int64) (bool, error)
-	
+
 	Iterator(storeKey StoreKey, start, end []byte, version int64) (Iterator, error)
 	ReverseIterator(storeKey StoreKey, start, end []byte, version int64) (Iterator, error)
-	
+
 	ApplyChangeset(version int64, cs *ChangeSet) error
 	GetLatestVersion() (int64, error)
 }
@@ -206,17 +206,17 @@ type StateCommitment interface {
 	WriteChangeset(cs *ChangeSet) error
 	Commit(version int64) ([]byte, error)
 	GetCommitInfo(version int64) (*CommitInfo, error)
-	
+
 	GetProof(storeKey StoreKey, version int64, key []byte) (*Proof, error)
 	GetLatestVersion() (int64, error)
 }
 
 // QueryResult defines the result of a query operation
 type QueryResult struct {
-	Key     []byte
-	Value   []byte
-	Height  int64
-	Proof   *Proof
+	Key    []byte
+	Value  []byte
+	Height int64
+	Proof  *Proof
 }
 
 // TraceWriter defines an interface for writing store traces

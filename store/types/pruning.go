@@ -118,7 +118,7 @@ func (po PruningOptions) String() string {
 	case PruningNothing:
 		return "nothing"
 	case PruningCustom:
-		return fmt.Sprintf("custom(keep_recent=%d,keep_every=%d,interval=%d)", 
+		return fmt.Sprintf("custom(keep_recent=%d,keep_every=%d,interval=%d)",
 			po.KeepRecent, po.KeepEvery, po.Interval)
 	default:
 		return "unknown"
@@ -147,26 +147,26 @@ func parseCustomPruning(s string) (PruningOptions, error) {
 	if !strings.HasPrefix(s, "custom(") || !strings.HasSuffix(s, ")") {
 		return PruningOptions{}, fmt.Errorf("invalid custom pruning format: %s", s)
 	}
-	
+
 	inner := s[7 : len(s)-1] // Remove "custom(" and ")"
 	parts := strings.Split(inner, ",")
-	
+
 	if len(parts) != 3 {
 		return PruningOptions{}, fmt.Errorf("custom pruning must have 3 parameters: %s", s)
 	}
-	
+
 	var keepRecent, keepEvery, interval uint64
 	var err error
-	
+
 	for _, part := range parts {
 		kv := strings.Split(strings.TrimSpace(part), "=")
 		if len(kv) != 2 {
 			return PruningOptions{}, fmt.Errorf("invalid parameter format: %s", part)
 		}
-		
+
 		key := strings.TrimSpace(kv[0])
 		value := strings.TrimSpace(kv[1])
-		
+
 		switch key {
 		case "keep_recent":
 			keepRecent, err = strconv.ParseUint(value, 10, 64)
@@ -177,12 +177,12 @@ func parseCustomPruning(s string) (PruningOptions, error) {
 		default:
 			return PruningOptions{}, fmt.Errorf("unknown parameter: %s", key)
 		}
-		
+
 		if err != nil {
 			return PruningOptions{}, fmt.Errorf("invalid value for %s: %s", key, value)
 		}
 	}
-	
+
 	return NewCustomPruningOptions(keepRecent, keepEvery, interval), nil
 }
 
@@ -191,24 +191,24 @@ func (po PruningOptions) ShouldPrune(currentHeight, version int64) bool {
 	if po.Strategy == PruningNothing {
 		return false
 	}
-	
+
 	if version <= 0 {
 		return false
 	}
-	
+
 	if po.Strategy == PruningEverything {
 		// Keep only the last two versions
 		return currentHeight-version > int64(po.KeepRecent)
 	}
-	
+
 	// For default and custom strategies
 	if currentHeight-version <= int64(po.KeepRecent) {
 		return false
 	}
-	
+
 	if po.KeepEvery > 0 && version%int64(po.KeepEvery) == 0 {
 		return false
 	}
-	
+
 	return true
 }

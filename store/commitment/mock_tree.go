@@ -10,18 +10,18 @@ import (
 // MockTree is a simple in-memory tree for testing purposes
 // In production, this would be replaced with a real IAVL tree
 type MockTree struct {
-	data      map[string][]byte
-	versions  map[int64]map[string][]byte
-	version   int64
+	data          map[string][]byte
+	versions      map[int64]map[string][]byte
+	version       int64
 	savedVersions map[int64]bool
 }
 
 // NewMockTree creates a new mock tree
 func NewMockTree() *MockTree {
 	return &MockTree{
-		data:      make(map[string][]byte),
-		versions:  make(map[int64]map[string][]byte),
-		version:   0,
+		data:          make(map[string][]byte),
+		versions:      make(map[int64]map[string][]byte),
+		version:       0,
 		savedVersions: make(map[int64]bool),
 	}
 }
@@ -61,7 +61,7 @@ func (t *MockTree) Version() int64 {
 
 func (t *MockTree) SaveVersion() ([]byte, int64, error) {
 	t.version++
-	
+
 	// Make a copy of current data
 	dataCopy := make(map[string][]byte)
 	for k, v := range t.data {
@@ -69,7 +69,7 @@ func (t *MockTree) SaveVersion() ([]byte, int64, error) {
 	}
 	t.versions[t.version] = dataCopy
 	t.savedVersions[t.version] = true
-	
+
 	hash := t.calculateHash(dataCopy)
 	return hash, t.version, nil
 }
@@ -79,13 +79,13 @@ func (t *MockTree) LoadVersion(version int64) error {
 	if !exists {
 		return nil // Version doesn't exist, start with empty tree
 	}
-	
+
 	// Replace current data with version data
 	t.data = make(map[string][]byte)
 	for k, v := range versionData {
 		t.data[k] = v
 	}
-	
+
 	t.version = version
 	return nil
 }
@@ -105,7 +105,7 @@ func (t *MockTree) GetVersionedProof(key []byte, version int64) (*types.Proof, e
 	if !exists {
 		return nil, nil
 	}
-	
+
 	return t.generateMockProof(key, versionData), nil
 }
 
@@ -128,20 +128,20 @@ func (t *MockTree) calculateHash(data map[string][]byte) []byte {
 	if len(data) == 0 {
 		return make([]byte, 32)
 	}
-	
+
 	// Sort keys for deterministic hashing
 	keys := make([]string, 0, len(data))
 	for k := range data {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	
+
 	hasher := sha256.New()
 	for _, k := range keys {
 		hasher.Write([]byte(k))
 		hasher.Write(data[k])
 	}
-	
+
 	return hasher.Sum(nil)
 }
 
@@ -176,7 +176,7 @@ func newMockTreeIterator(data map[string][]byte, start, end []byte, ascending bo
 		ascending: ascending,
 		index:     0,
 	}
-	
+
 	// Filter and sort keys
 	for k := range data {
 		key := []byte(k)
@@ -184,7 +184,7 @@ func newMockTreeIterator(data map[string][]byte, start, end []byte, ascending bo
 			iter.keys = append(iter.keys, k)
 		}
 	}
-	
+
 	sort.Strings(iter.keys)
 	if !ascending {
 		// Reverse for descending order
@@ -192,7 +192,7 @@ func newMockTreeIterator(data map[string][]byte, start, end []byte, ascending bo
 			iter.keys[i], iter.keys[j] = iter.keys[j], iter.keys[i]
 		}
 	}
-	
+
 	return iter
 }
 

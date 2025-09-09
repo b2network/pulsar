@@ -12,21 +12,21 @@ type Store struct {
 	mu sync.RWMutex
 
 	// Core components
-	stateStorage     types.StateStorage
-	stateCommitment  types.StateCommitment
-	
+	stateStorage    types.StateStorage
+	stateCommitment types.StateCommitment
+
 	// Store management
-	stores         map[types.StoreKey]types.CommitKVStore
-	keysByName     map[string]types.StoreKey
-	pruning        types.PruningOptions
-	
+	stores     map[types.StoreKey]types.CommitKVStore
+	keysByName map[string]types.StoreKey
+	pruning    types.PruningOptions
+
 	// Version tracking
 	lastCommitInfo *types.CommitInfo
 	initialVersion int64
-	
+
 	// Cache layer
 	cacheStore types.CacheMultiStore
-	
+
 	// Tracing
 	traceWriter types.TraceWriter
 	tracing     bool
@@ -48,15 +48,15 @@ func NewStore(config StoreConfig) *Store {
 	if config.StateCommitment == nil {
 		panic("state commitment cannot be nil")
 	}
-	
+
 	return &Store{
 		stateStorage:    config.StateStorage,
 		stateCommitment: config.StateCommitment,
-		stores:         make(map[types.StoreKey]types.CommitKVStore),
-		keysByName:     make(map[string]types.StoreKey),
-		pruning:        config.Pruning,
-		initialVersion: config.InitialVersion,
-		lastCommitInfo: &types.CommitInfo{},
+		stores:          make(map[types.StoreKey]types.CommitKVStore),
+		keysByName:      make(map[string]types.StoreKey),
+		pruning:         config.Pruning,
+		initialVersion:  config.InitialVersion,
+		lastCommitInfo:  &types.CommitInfo{},
 	}
 }
 
@@ -86,15 +86,15 @@ func (s *Store) GetStoreType() types.StoreType {
 func (s *Store) MountStoreWithDB(key types.StoreKey, typ types.StoreType, db types.DB) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.stores[key] != nil {
 		panic(fmt.Sprintf("store duplicate store key: %v", key))
 	}
-	
+
 	if s.keysByName[key.Name()] != nil {
 		panic(fmt.Sprintf("store duplicate store key name: %s", key.Name()))
 	}
-	
+
 	// Create appropriate store based on type
 	var store types.CommitKVStore
 	switch typ {
@@ -109,7 +109,7 @@ func (s *Store) MountStoreWithDB(key types.StoreKey, typ types.StoreType, db typ
 	default:
 		panic(fmt.Sprintf("unsupported store type: %v", typ))
 	}
-	
+
 	s.stores[key] = store
 	s.keysByName[key.Name()] = key
 }
@@ -118,12 +118,12 @@ func (s *Store) MountStoreWithDB(key types.StoreKey, typ types.StoreType, db typ
 func (s *Store) LoadLatestVersion() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	version, err := s.stateStorage.GetLatestVersion()
 	if err != nil {
 		return fmt.Errorf("failed to get latest version: %w", err)
 	}
-	
+
 	return s.loadVersionInternal(version)
 }
 
@@ -131,7 +131,7 @@ func (s *Store) LoadLatestVersion() error {
 func (s *Store) LoadVersion(version int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	return s.loadVersionInternal(version)
 }
 
@@ -140,22 +140,22 @@ func (s *Store) loadVersionInternal(version int64) error {
 	if version < s.initialVersion {
 		return fmt.Errorf("cannot load version %d, initial version is %d", version, s.initialVersion)
 	}
-	
+
 	// Load commit info for this version
 	commitInfo, err := s.stateCommitment.GetCommitInfo(version)
 	if err != nil {
 		return fmt.Errorf("failed to get commit info for version %d: %w", version, err)
 	}
-	
+
 	s.lastCommitInfo = commitInfo
-	
+
 	// Initialize all mounted stores
 	for key, store := range s.stores {
 		if err := s.loadStoreVersion(key, store, version); err != nil {
 			return fmt.Errorf("failed to load store %s: %w", key.Name(), err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -169,7 +169,7 @@ func (s *Store) loadStoreVersion(key types.StoreKey, store types.CommitKVStore, 
 func (s *Store) GetStore(key types.StoreKey) types.Store {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	return s.stores[key]
 }
 
@@ -177,12 +177,12 @@ func (s *Store) GetStore(key types.StoreKey) types.Store {
 func (s *Store) GetKVStore(key types.StoreKey) types.KVStore {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	store := s.stores[key]
 	if store == nil {
 		panic(fmt.Sprintf("store does not exist for key: %s", key.Name()))
 	}
-	
+
 	return store
 }
 
@@ -190,7 +190,7 @@ func (s *Store) GetKVStore(key types.StoreKey) types.KVStore {
 func (s *Store) GetCommitKVStore(key types.StoreKey) types.CommitKVStore {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	return s.stores[key]
 }
 
@@ -198,7 +198,7 @@ func (s *Store) GetCommitKVStore(key types.StoreKey) types.CommitKVStore {
 func (s *Store) GetCommitStore(key types.StoreKey) types.CommitStore {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	return s.stores[key]
 }
 
@@ -206,7 +206,7 @@ func (s *Store) GetCommitStore(key types.StoreKey) types.CommitStore {
 func (s *Store) Commit() types.CommitID {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Get the next version
 	var version int64
 	if s.lastCommitInfo != nil {
@@ -214,51 +214,51 @@ func (s *Store) Commit() types.CommitID {
 	} else {
 		version = s.initialVersion
 	}
-	
+
 	if version < s.initialVersion {
 		version = s.initialVersion
 	}
-	
+
 	// Collect changes from all stores
 	changeset := &types.ChangeSet{}
 	storeInfos := make([]types.StoreInfo, 0, len(s.stores))
-	
+
 	for key, store := range s.stores {
 		// Commit each store and collect its changes
 		commitID := store.Commit()
-		
+
 		storeInfos = append(storeInfos, types.StoreInfo{
 			Name:     key.Name(),
 			CommitId: commitID,
 		})
-		
+
 		// TODO: Collect actual changes from store
 		// This would involve tracking modifications made to each store
 	}
-	
+
 	// Apply changeset to storage layer
 	if err := s.stateStorage.ApplyChangeset(version, changeset); err != nil {
 		panic(fmt.Sprintf("failed to apply changeset: %v", err))
 	}
-	
+
 	// Commit to commitment layer
 	if err := s.stateCommitment.WriteChangeset(changeset); err != nil {
 		panic(fmt.Sprintf("failed to write changeset to commitment layer: %v", err))
 	}
-	
+
 	hash, err := s.stateCommitment.Commit(version)
 	if err != nil {
 		panic(fmt.Sprintf("failed to commit to commitment layer: %v", err))
 	}
-	
+
 	// Update commit info
 	commitInfo := &types.CommitInfo{
 		Version:    version,
 		StoreInfos: storeInfos,
 	}
-	
+
 	s.lastCommitInfo = commitInfo
-	
+
 	return types.CommitID{
 		Version: version,
 		Hash:    hash,
@@ -269,11 +269,11 @@ func (s *Store) Commit() types.CommitID {
 func (s *Store) LastCommitID() types.CommitID {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if s.lastCommitInfo == nil {
 		return types.CommitID{}
 	}
-	
+
 	return types.CommitID{
 		Version: s.lastCommitInfo.Version,
 		Hash:    nil, // TODO: Get actual hash from commitment layer
@@ -303,10 +303,10 @@ func (s *Store) TracingEnabled() bool {
 func (s *Store) SetTracer(w types.TraceWriter) types.MultiStore {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.traceWriter = w
 	s.tracing = w != nil
-	
+
 	return s
 }
 
@@ -319,11 +319,11 @@ func (s *Store) CacheWrap() types.CacheWrap {
 func (s *Store) CacheMultiStore() types.CacheMultiStore {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.cacheStore == nil {
 		s.cacheStore = newCacheMultiStore(s)
 	}
-	
+
 	return s.cacheStore
 }
 
@@ -331,19 +331,19 @@ func (s *Store) CacheMultiStore() types.CacheMultiStore {
 func (s *Store) Query(storeKey types.StoreKey, version int64, key []byte, prove bool) (types.QueryResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	// Get value from storage layer
 	value, err := s.stateStorage.Get(storeKey, key, version)
 	if err != nil {
 		return types.QueryResult{}, fmt.Errorf("failed to get value: %w", err)
 	}
-	
+
 	result := types.QueryResult{
 		Key:    key,
 		Value:  value,
 		Height: version,
 	}
-	
+
 	// Get proof if requested
 	if prove {
 		proof, err := s.stateCommitment.GetProof(storeKey, version, key)
@@ -352,6 +352,6 @@ func (s *Store) Query(storeKey types.StoreKey, version int64, key []byte, prove 
 		}
 		result.Proof = proof
 	}
-	
+
 	return result, nil
 }

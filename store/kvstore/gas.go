@@ -68,20 +68,20 @@ func (s *GasKVStore) Write() {
 
 func (s *GasKVStore) Get(key []byte) []byte {
 	s.gasMeter.ConsumeGas(s.gasConfig.ReadCostFlat, "KVStore.Get")
-	
+
 	value := s.parent.Get(key)
 	if value != nil {
 		s.gasMeter.ConsumeGas(s.gasConfig.ReadCostPerByte*uint64(len(key)), "KVStore.Get.Key")
 		s.gasMeter.ConsumeGas(s.gasConfig.ReadCostPerByte*uint64(len(value)), "KVStore.Get.Value")
 	}
-	
+
 	return value
 }
 
 func (s *GasKVStore) Has(key []byte) bool {
 	s.gasMeter.ConsumeGas(s.gasConfig.HasCost, "KVStore.Has")
 	s.gasMeter.ConsumeGas(s.gasConfig.ReadCostPerByte*uint64(len(key)), "KVStore.Has.Key")
-	
+
 	return s.parent.Has(key)
 }
 
@@ -89,14 +89,14 @@ func (s *GasKVStore) Set(key, value []byte) {
 	s.gasMeter.ConsumeGas(s.gasConfig.WriteCostFlat, "KVStore.Set")
 	s.gasMeter.ConsumeGas(s.gasConfig.WriteCostPerByte*uint64(len(key)), "KVStore.Set.Key")
 	s.gasMeter.ConsumeGas(s.gasConfig.WriteCostPerByte*uint64(len(value)), "KVStore.Set.Value")
-	
+
 	s.parent.Set(key, value)
 }
 
 func (s *GasKVStore) Delete(key []byte) {
 	s.gasMeter.ConsumeGas(s.gasConfig.DeleteCost, "KVStore.Delete")
 	s.gasMeter.ConsumeGas(s.gasConfig.ReadCostPerByte*uint64(len(key)), "KVStore.Delete.Key")
-	
+
 	s.parent.Delete(key)
 }
 
@@ -115,7 +115,7 @@ func (s *GasKVStore) iterator(start, end []byte, reverse bool) types.Iterator {
 	} else {
 		parentIter = s.parent.Iterator(start, end)
 	}
-	
+
 	return newGasIterator(parentIter, s.gasMeter, s.gasConfig)
 }
 

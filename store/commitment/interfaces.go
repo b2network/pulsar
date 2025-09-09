@@ -8,43 +8,43 @@ import (
 type Tree interface {
 	// Set stores a key-value pair in the tree
 	Set(key, value []byte) (bool, error)
-	
+
 	// Remove deletes a key from the tree
 	Remove(key []byte) ([]byte, bool, error)
-	
+
 	// Get retrieves a value by key
 	Get(key []byte) ([]byte, error)
-	
+
 	// Has checks if a key exists
 	Has(key []byte) (bool, error)
-	
+
 	// Hash returns the root hash of the tree
 	Hash() ([]byte, error)
-	
+
 	// Version returns the current version of the tree
 	Version() int64
-	
+
 	// SaveVersion saves the current state and returns the hash and version
 	SaveVersion() ([]byte, int64, error)
-	
+
 	// LoadVersion loads a specific version of the tree
 	LoadVersion(version int64) error
-	
+
 	// DeleteVersion deletes a specific version
 	DeleteVersion(version int64) error
-	
+
 	// GetProof generates a proof for a key
 	GetProof(key []byte) (*types.Proof, error)
-	
+
 	// GetVersionedProof generates a proof for a key at a specific version
 	GetVersionedProof(key []byte, version int64) (*types.Proof, error)
-	
+
 	// VerifyProof verifies a proof against the root hash
 	VerifyProof(proof *types.Proof, rootHash []byte, key []byte, value []byte) bool
-	
+
 	// Iterator creates an iterator for the tree
 	Iterator(start, end []byte, ascending bool) (types.Iterator, error)
-	
+
 	// Close closes the tree
 	Close() error
 }
@@ -53,13 +53,13 @@ type Tree interface {
 type StateCommitmentImpl struct {
 	// Map of store names to their commitment trees
 	trees map[string]Tree
-	
+
 	// Store for commitment info metadata
 	commitInfoStore CommitInfoStore
-	
+
 	// Current version being worked on
 	workingVersion int64
-	
+
 	// Latest committed version
 	latestVersion int64
 }
@@ -68,13 +68,13 @@ type StateCommitmentImpl struct {
 type CommitInfoStore interface {
 	// SaveCommitInfo saves commit information for a version
 	SaveCommitInfo(version int64, info *types.CommitInfo) error
-	
+
 	// LoadCommitInfo loads commit information for a version
 	LoadCommitInfo(version int64) (*types.CommitInfo, error)
-	
+
 	// GetLatestVersion returns the latest committed version
 	GetLatestVersion() (int64, error)
-	
+
 	// Close closes the commit info store
 	Close() error
 }
@@ -95,7 +95,7 @@ func (s *StateCommitmentImpl) WriteChangeset(cs *types.ChangeSet) error {
 	for _, pair := range cs.Pairs {
 		// Extract store name from key (assuming format: "store_name/actual_key")
 		storeName, actualKey := s.parseKey(pair.Key)
-		
+
 		tree := s.trees[storeName]
 		if tree == nil {
 			// Create new tree for this store if it doesn't exist
@@ -106,7 +106,7 @@ func (s *StateCommitmentImpl) WriteChangeset(cs *types.ChangeSet) error {
 			}
 			s.trees[storeName] = tree
 		}
-		
+
 		if pair.Delete {
 			_, _, err := tree.Remove(actualKey)
 			if err != nil {
@@ -119,21 +119,21 @@ func (s *StateCommitmentImpl) WriteChangeset(cs *types.ChangeSet) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 // Commit commits the current changeset and returns the root hash
 func (s *StateCommitmentImpl) Commit(version int64) ([]byte, error) {
 	storeInfos := make([]types.StoreInfo, 0, len(s.trees))
-	
+
 	// Save each tree and collect store infos
 	for storeName, tree := range s.trees {
 		hash, treeVersion, err := tree.SaveVersion()
 		if err != nil {
 			return nil, err
 		}
-		
+
 		storeInfos = append(storeInfos, types.StoreInfo{
 			Name: storeName,
 			CommitId: types.CommitID{
@@ -142,21 +142,21 @@ func (s *StateCommitmentImpl) Commit(version int64) ([]byte, error) {
 			},
 		})
 	}
-	
+
 	// Create commit info
 	commitInfo := &types.CommitInfo{
 		Version:    version,
 		StoreInfos: storeInfos,
 	}
-	
+
 	// Save commit info
 	if err := s.commitInfoStore.SaveCommitInfo(version, commitInfo); err != nil {
 		return nil, err
 	}
-	
+
 	s.latestVersion = version
 	s.workingVersion = version + 1
-	
+
 	// Calculate overall root hash (simplified - just hash of all store hashes)
 	return s.calculateRootHash(storeInfos), nil
 }
@@ -172,7 +172,7 @@ func (s *StateCommitmentImpl) GetProof(storeKey types.StoreKey, version int64, k
 	if tree == nil {
 		return nil, nil
 	}
-	
+
 	return tree.GetVersionedProof(key, version)
 }
 

@@ -11,18 +11,18 @@ import (
 // Manager handles pruning of historical versions
 type Manager struct {
 	mu sync.RWMutex
-	
+
 	// Pruning configuration
 	options types.PruningOptions
-	
+
 	// Components that can be pruned
 	stateStorage    StateStoragePruner
 	stateCommitment StateCommitmentPruner
-	
+
 	// Pruning state
 	lastPruneHeight int64
 	pruning         bool
-	
+
 	// Background pruning
 	stopChan chan struct{}
 	stopped  bool
@@ -64,7 +64,7 @@ func (m *Manager) Start() {
 	if m.options.Strategy == types.PruningNothing {
 		return // No pruning needed
 	}
-	
+
 	go m.pruningLoop()
 }
 
@@ -72,7 +72,7 @@ func (m *Manager) Start() {
 func (m *Manager) Stop() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if !m.stopped {
 		close(m.stopChan)
 		m.stopped = true
@@ -83,7 +83,7 @@ func (m *Manager) Stop() {
 func (m *Manager) ShouldPrune(currentHeight, height int64) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	return m.options.ShouldPrune(currentHeight, height)
 }
 
@@ -91,32 +91,32 @@ func (m *Manager) ShouldPrune(currentHeight, height int64) bool {
 func (m *Manager) PruneHeight(height int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.pruning {
 		return fmt.Errorf("pruning already in progress")
 	}
-	
+
 	m.pruning = true
 	defer func() {
 		m.pruning = false
 	}()
-	
+
 	versions := []int64{height}
-	
+
 	// Prune state storage
 	if m.stateStorage != nil {
 		if err := m.stateStorage.PruneVersions(versions); err != nil {
 			return fmt.Errorf("failed to prune state storage: %w", err)
 		}
 	}
-	
+
 	// Prune state commitment
 	if m.stateCommitment != nil {
 		if err := m.stateCommitment.PruneVersions(versions); err != nil {
 			return fmt.Errorf("failed to prune state commitment: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -125,39 +125,39 @@ func (m *Manager) PruneRange(fromHeight, toHeight int64) error {
 	if fromHeight > toHeight {
 		return fmt.Errorf("invalid range: from %d to %d", fromHeight, toHeight)
 	}
-	
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	if m.pruning {
 		return fmt.Errorf("pruning already in progress")
 	}
-	
+
 	m.pruning = true
 	defer func() {
 		m.pruning = false
 	}()
-	
+
 	// Collect versions to prune
 	versions := make([]int64, 0, toHeight-fromHeight+1)
 	for height := fromHeight; height <= toHeight; height++ {
 		versions = append(versions, height)
 	}
-	
+
 	// Prune state storage
 	if m.stateStorage != nil {
 		if err := m.stateStorage.PruneVersions(versions); err != nil {
 			return fmt.Errorf("failed to prune state storage: %w", err)
 		}
 	}
-	
+
 	// Prune state commitment
 	if m.stateCommitment != nil {
 		if err := m.stateCommitment.PruneVersions(versions); err != nil {
 			return fmt.Errorf("failed to prune state commitment: %w", err)
 		}
 	}
-	
+
 	m.lastPruneHeight = toHeight
 	return nil
 }
@@ -166,31 +166,31 @@ func (m *Manager) PruneRange(fromHeight, toHeight int64) error {
 func (m *Manager) GetPrunableHeights(currentHeight int64) []int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	if m.options.Strategy == types.PruningNothing {
 		return nil
 	}
-	
+
 	var prunableHeights []int64
-	
+
 	// Calculate pruning range
 	var startHeight int64 = 1
 	if m.lastPruneHeight > 0 {
 		startHeight = m.lastPruneHeight + 1
 	}
-	
+
 	// Don't prune recent heights
 	maxPruneHeight := currentHeight - int64(m.options.KeepRecent)
 	if maxPruneHeight < startHeight {
 		return nil
 	}
-	
+
 	for height := startHeight; height <= maxPruneHeight; height++ {
 		if m.options.ShouldPrune(currentHeight, height) {
 			prunableHeights = append(prunableHeights, height)
 		}
 	}
-	
+
 	return prunableHeights
 }
 
@@ -198,7 +198,7 @@ func (m *Manager) GetPrunableHeights(currentHeight int64) []int64 {
 func (m *Manager) SetOptions(options types.PruningOptions) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.options = options
 }
 
@@ -206,7 +206,7 @@ func (m *Manager) SetOptions(options types.PruningOptions) {
 func (m *Manager) GetOptions() types.PruningOptions {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	return m.options
 }
 
@@ -214,7 +214,7 @@ func (m *Manager) GetOptions() types.PruningOptions {
 func (m *Manager) IsPruning() bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	return m.pruning
 }
 
@@ -222,7 +222,7 @@ func (m *Manager) IsPruning() bool {
 func (m *Manager) GetLastPruneHeight() int64 {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	return m.lastPruneHeight
 }
 
@@ -230,10 +230,10 @@ func (m *Manager) pruningLoop() {
 	if m.options.Interval == 0 {
 		return // No interval pruning
 	}
-	
+
 	ticker := time.NewTicker(time.Duration(m.options.Interval) * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-m.stopChan:
@@ -251,17 +251,17 @@ func (m *Manager) AutoPrune(currentHeight int64) error {
 	if m.options.Strategy == types.PruningNothing {
 		return nil
 	}
-	
+
 	// Only prune if we're at an interval boundary
 	if m.options.Interval > 0 && currentHeight%int64(m.options.Interval) != 0 {
 		return nil
 	}
-	
+
 	prunableHeights := m.GetPrunableHeights(currentHeight)
 	if len(prunableHeights) == 0 {
 		return nil
 	}
-	
+
 	// Prune in batches to avoid large operations
 	const batchSize = 100
 	for i := 0; i < len(prunableHeights); i += batchSize {
@@ -269,15 +269,15 @@ func (m *Manager) AutoPrune(currentHeight int64) error {
 		if end > len(prunableHeights) {
 			end = len(prunableHeights)
 		}
-		
+
 		batch := prunableHeights[i:end]
 		fromHeight := batch[0]
 		toHeight := batch[len(batch)-1]
-		
+
 		if err := m.PruneRange(fromHeight, toHeight); err != nil {
 			return fmt.Errorf("failed to prune batch %d-%d: %w", fromHeight, toHeight, err)
 		}
 	}
-	
+
 	return nil
 }
