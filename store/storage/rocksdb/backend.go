@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/b2network/pulsar/store/storage"
 	"github.com/b2network/pulsar/store/types"
 	"github.com/linxGnu/grocksdb"
 )
@@ -35,7 +34,7 @@ type Config struct {
 
 	// Performance tuning
 	MaxOpenFiles                   int
-	WriteBufferSize                int
+	WriteBufferSize                uint64
 	MaxWriteBufferNum              int
 	MinWriteBufferNum              int
 	Level0FileNumCompactionTrigger int
@@ -47,7 +46,7 @@ type Config struct {
 	TargetFileSizeMultiplier       int
 
 	// Block cache
-	BlockCacheSize int64
+	BlockCacheSize uint64
 }
 
 // DefaultConfig returns default RocksDB configuration
@@ -103,7 +102,7 @@ func NewBackend(config *Config) (*Backend, error) {
 	options.SetBlockBasedTableFactory(blockBasedTableOptions)
 
 	// Use LZ4 compression for better performance
-	options.SetCompression(grocksdb.LZ4Compression)
+	options.SetCompression(grocksdb.CompressionType(grocksdb.LZ4Compression))
 
 	// Column family setup for versioning
 	cfNames := []string{"default", "versions"}

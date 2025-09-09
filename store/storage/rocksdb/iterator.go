@@ -3,7 +3,6 @@ package rocksdb
 import (
 	"bytes"
 
-	"github.com/b2network/pulsar/store/types"
 	"github.com/linxGnu/grocksdb"
 )
 
