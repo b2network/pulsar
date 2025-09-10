@@ -70,7 +70,7 @@ func initNode(homeDir, moniker string) error {
 
 	// Create application genesis state
 	appState := make(map[string]json.RawMessage)
-	
+
 	// Bank module genesis
 	bankGenesis := banktypes.DefaultGenesisState()
 	bankGenesisBytes, err := json.Marshal(bankGenesis)
@@ -78,7 +78,7 @@ func initNode(homeDir, moniker string) error {
 		return fmt.Errorf("failed to marshal bank genesis: %w", err)
 	}
 	appState[banktypes.ModuleName] = bankGenesisBytes
-	
+
 	// Staking module genesis
 	stakingGenesis := stakingtypes.DefaultGenesisState()
 	stakingGenesisBytes, err := json.Marshal(stakingGenesis)
@@ -86,7 +86,7 @@ func initNode(homeDir, moniker string) error {
 		return fmt.Errorf("failed to marshal staking genesis: %w", err)
 	}
 	appState[stakingtypes.ModuleName] = stakingGenesisBytes
-	
+
 	// Gov module genesis
 	govGenesis := govtypes.DefaultGenesisState()
 	govGenesisBytes, err := json.Marshal(govGenesis)
@@ -94,7 +94,7 @@ func initNode(homeDir, moniker string) error {
 		return fmt.Errorf("failed to marshal gov genesis: %w", err)
 	}
 	appState[govtypes.ModuleName] = govGenesisBytes
-	
+
 	appStateBytes, err := json.Marshal(appState)
 	if err != nil {
 		return fmt.Errorf("failed to marshal app state: %w", err)

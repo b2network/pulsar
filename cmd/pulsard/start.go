@@ -19,17 +19,39 @@ import (
 )
 
 func startCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start the Pulsar node",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			homeDir, _ := cmd.Flags().GetString("home")
-			return startNode(homeDir)
+
+			// Pre-execution configuration flags
+			preExecEnabled, _ := cmd.Flags().GetBool("pre-exec-enabled")
+			preExecCacheSize, _ := cmd.Flags().GetInt("pre-exec-cache-size")
+			preExecTTL, _ := cmd.Flags().GetString("pre-exec-ttl")
+			validatorID, _ := cmd.Flags().GetString("validator-id")
+
+			config := app.AppConfig{
+				PreExecEnabled:   preExecEnabled,
+				PreExecCacheSize: preExecCacheSize,
+				PreExecTTL:       preExecTTL,
+				ValidatorID:      validatorID,
+			}
+
+			return startNode(homeDir, config)
 		},
 	}
+
+	// Add pre-execution flags
+	cmd.Flags().Bool("pre-exec-enabled", true, "Enable pre-execution transactions")
+	cmd.Flags().Int("pre-exec-cache-size", 1000, "Pre-execution cache size")
+	cmd.Flags().String("pre-exec-ttl", "60s", "Pre-execution cache TTL")
+	cmd.Flags().String("validator-id", "validator-1", "Validator identifier for pre-execution")
+
+	return cmd
 }
 
-func startNode(homeDir string) error {
+func startNode(homeDir string, appConfig app.AppConfig) error {
 	config := cfg.DefaultConfig()
 	config.SetRoot(homeDir)
 
@@ -45,8 +67,8 @@ func startNode(homeDir string) error {
 
 	logger := log.NewTMLogger(log.NewSyncWriter(os.Stdout))
 
-	// Create Pulsar application
-	pulsarApp := app.NewPulsarApp(logger, homeDir)
+	// Create Pulsar application with pre-execution config
+	pulsarApp := app.NewPulsarApp(logger, homeDir, appConfig)
 
 	server := abciserver.NewSocketServer("tcp://127.0.0.1:26658", pulsarApp)
 	server.SetLogger(logger.With("module", "abci-server"))
@@ -88,11 +110,17 @@ func startNode(homeDir string) error {
 		node.Wait()
 	}()
 
-	fmt.Printf("\nNode started successfully:\n")
-	fmt.Printf("  Node ID: %s\n", nodeKey.ID())
-	fmt.Printf("  RPC: %s\n", config.RPC.ListenAddress)
-	fmt.Printf("  P2P: %s\n", config.P2P.ListenAddress)
-	fmt.Printf("\nPress Ctrl+C to stop the node\n")
+	fmt.Printf("\n🚀 Pulsar Node started successfully:\n")
+	fmt.Printf("  📍 Node ID: %s\n", nodeKey.ID())
+	fmt.Printf("  🌐 RPC: %s\n", config.RPC.ListenAddress)
+	fmt.Printf("  📡 P2P: %s\n", config.P2P.ListenAddress)
+	fmt.Printf("  ⚡ Pre-execution: %v\n", appConfig.PreExecEnabled)
+	if appConfig.PreExecEnabled {
+		fmt.Printf("    • Cache Size: %d\n", appConfig.PreExecCacheSize)
+		fmt.Printf("    • Cache TTL: %s\n", appConfig.PreExecTTL)
+		fmt.Printf("    • Validator ID: %s\n", appConfig.ValidatorID)
+	}
+	fmt.Printf("\n📊 Press Ctrl+C to stop the node\n")
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)

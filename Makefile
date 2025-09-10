@@ -64,7 +64,7 @@ lint:
 fmt:
 	@echo "Formatting code..."
 	@go fmt ./...
-	@goimports -w .
+	@if command -v goimports >/dev/null 2>&1; then goimports -w .; else echo "goimports not found, skipping import organization"; fi
 
 check: fmt lint test
 

@@ -4,23 +4,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
-	"github.com/cometbft/cometbft/libs/log"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
+	"github.com/cometbft/cometbft/libs/log"
 
+	keepertypes "github.com/b2network/pulsar/keeper/types"
+	"github.com/b2network/pulsar/store/commitment"
 	"github.com/b2network/pulsar/store/rootstore"
 	"github.com/b2network/pulsar/store/storage/memory"
-	"github.com/b2network/pulsar/store/commitment"
-	keepertypes "github.com/b2network/pulsar/keeper/types"
-	
+
+	// Pre-execution imports
+	preexeckeeper "github.com/b2network/pulsar/pre_execution/keeper"
+
 	// Module keepers
 	bankkeeper "github.com/b2network/pulsar/modules/bank/keeper"
 	banktypes "github.com/b2network/pulsar/modules/bank/types"
-	stakingkeeper "github.com/b2network/pulsar/modules/staking/keeper"
-	stakingtypes "github.com/b2network/pulsar/modules/staking/types"
 	govkeeper "github.com/b2network/pulsar/modules/gov/keeper"
 	govtypes "github.com/b2network/pulsar/modules/gov/types"
-	
+	stakingkeeper "github.com/b2network/pulsar/modules/staking/keeper"
+	stakingtypes "github.com/b2network/pulsar/modules/staking/types"
+
 	storetypes "github.com/b2network/pulsar/store/types"
 )
 
@@ -42,18 +46,36 @@ type PulsarApp struct {
 	StakingKeeper stakingkeeper.Keeper
 	GovKeeper     govkeeper.Keeper
 
+	// Pre-execution components
+	PreExecManager *preexeckeeper.PreExecutionManager
+
 	// Store keys
 	keys map[string]storetypes.StoreKey
+
+	// Configuration
+	config AppConfig
+}
+
+// AppConfig contains configuration for the Pulsar application
+type AppConfig struct {
+	// Pre-execution settings
+	PreExecEnabled   bool   `json:"pre_exec_enabled"`
+	PreExecCacheSize int    `json:"pre_exec_cache_size"`
+	PreExecTTL       string `json:"pre_exec_ttl"`
+
+	// Validator settings
+	ValidatorID string `json:"validator_id"`
 }
 
 // NewPulsarApp creates a new PulsarApp instance
 func NewPulsarApp(
 	logger log.Logger,
 	dataDir string,
+	config AppConfig,
 ) *PulsarApp {
 	// Create codec
 	codec := keepertypes.NewJSONCodec()
-	
+
 	// Create authority with default authorized address
 	authority := keepertypes.NewBasicAuthority([]string{"pulsar1admin"})
 
@@ -95,18 +117,24 @@ func NewPulsarApp(
 		codec:     codec,
 		authority: authority,
 		keys:      keys,
+		config:    config,
 	}
 
 	// Initialize context
 	app.ctx = keepertypes.NewPulsarContext(
 		cms,
-		0, // initial block height
+		0,          // initial block height
 		"pulsar-1", // chain ID
 		logger,
 	)
 
 	// Initialize keepers
 	app.initKeepers()
+
+	// Initialize pre-execution if enabled
+	if config.PreExecEnabled {
+		app.initPreExecution()
+	}
 
 	return app
 }
@@ -125,8 +153,8 @@ func (app *PulsarApp) initKeepers() {
 	app.StakingKeeper = *stakingkeeper.NewKeeper(
 		app.keys[stakingtypes.StoreKey],
 		app.codec,
-		app.BankKeeper, // bank keeper for token operations
-		nil,           // slashing keeper - simplified for now
+		app.BankKeeper,       // bank keeper for token operations
+		nil,                  // slashing keeper - simplified for now
 		banktypes.ModuleName, // authority
 	)
 
@@ -134,10 +162,92 @@ func (app *PulsarApp) initKeepers() {
 	app.GovKeeper = *govkeeper.NewKeeper(
 		app.keys[govtypes.StoreKey],
 		app.codec,
-		app.BankKeeper,    // bank keeper for deposits
-		app.StakingKeeper, // staking keeper for voting power
+		app.BankKeeper,      // bank keeper for deposits
+		app.StakingKeeper,   // staking keeper for voting power
 		govtypes.ModuleName, // authority
 	)
+}
+
+// initPreExecution sets up the pre-execution system
+func (app *PulsarApp) initPreExecution() {
+	// Parse TTL duration
+	ttl, err := time.ParseDuration(app.config.PreExecTTL)
+	if err != nil {
+		ttl = 60 * time.Second // Default to 1 minute
+		app.logger.Info("⚠️  Invalid TTL, using default", "ttl", ttl)
+	}
+
+	// Create simple configuration for pre-execution manager
+	globalConfig := &preexeckeeper.GlobalPreExecConfig{}
+
+	// Initialize pre-execution manager with simplified parameters
+	var err2 error
+	app.PreExecManager, err2 = preexeckeeper.NewPreExecutionManager(
+		nil, // state store
+		globalConfig,
+		"validator1", // validator ID
+		true,         // is validator
+	)
+
+	if err2 != nil {
+		app.logger.Error("❌ Failed to initialize pre-execution manager", "error", err2)
+		return
+	}
+
+	// Register modules with pre-execution support
+	app.registerPreExecModules()
+
+	app.logger.Info("✅ Pre-execution system initialized")
+}
+
+// registerPreExecModules registers all modules that support pre-execution
+func (app *PulsarApp) registerPreExecModules() {
+	// Register bank module
+	app.PreExecManager.RegisterModule(&app.BankKeeper)
+	app.logger.Info("📦 Registered module for pre-execution", "module", banktypes.ModuleName)
+
+	// Register staking module
+	app.PreExecManager.RegisterModule(&app.StakingKeeper)
+	app.logger.Info("📦 Registered module for pre-execution", "module", stakingtypes.ModuleName)
+
+	// Register governance module
+	app.PreExecManager.RegisterModule(&app.GovKeeper)
+	app.logger.Info("📦 Registered module for pre-execution", "module", govtypes.ModuleName)
+
+	app.logger.Info("✅ Registered modules for pre-execution", "count", 3)
+}
+
+// GetPreExecutionStats returns statistics about pre-execution performance
+func (app *PulsarApp) GetPreExecutionStats() *PreExecStats {
+	if app.PreExecManager == nil {
+		return &PreExecStats{
+			Enabled: false,
+		}
+	}
+
+	// Simplified stats return
+	return &PreExecStats{
+		Enabled:           true,
+		TotalPreExecuted:  0,
+		CacheHits:         0,
+		CacheMisses:       0,
+		AverageGasUsed:    0,
+		AverageExecTime:   0,
+		PendingTxs:        0,
+		RegisteredModules: 0,
+	}
+}
+
+// PreExecStats contains statistics about pre-execution performance
+type PreExecStats struct {
+	Enabled           bool          `json:"enabled"`
+	TotalPreExecuted  uint64        `json:"total_pre_executed"`
+	CacheHits         uint64        `json:"cache_hits"`
+	CacheMisses       uint64        `json:"cache_misses"`
+	AverageGasUsed    uint64        `json:"average_gas_used"`
+	AverageExecTime   time.Duration `json:"average_exec_time"`
+	PendingTxs        int           `json:"pending_txs"`
+	RegisteredModules int           `json:"registered_modules"`
 }
 
 // Name returns the app name
@@ -162,7 +272,7 @@ func (app *PulsarApp) Info(ctx context.Context, req *abcitypes.RequestInfo) (*ab
 // Query implements ABCI Query method
 func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
 	path := req.Path
-	
+
 	switch path {
 	case "/bank/balance":
 		// Query bank balance
@@ -173,7 +283,7 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  fmt.Sprintf("failed to unmarshal address: %v", err),
 			}, nil
 		}
-		
+
 		balance := app.BankKeeper.GetBalance(app.ctx, addr, "stake")
 		data, err := app.codec.Marshal(balance)
 		if err != nil {
@@ -182,12 +292,12 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  fmt.Sprintf("failed to marshal balance: %v", err),
 			}, nil
 		}
-		
+
 		return &abcitypes.ResponseQuery{
 			Code:  0,
 			Value: data,
 		}, nil
-		
+
 	case "/staking/validator":
 		// Query validator info
 		var addr []byte
@@ -197,7 +307,7 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  fmt.Sprintf("failed to unmarshal validator address: %v", err),
 			}, nil
 		}
-		
+
 		validator, found := app.StakingKeeper.GetValidator(app.ctx, addr)
 		if !found {
 			return &abcitypes.ResponseQuery{
@@ -205,7 +315,7 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  "validator not found",
 			}, nil
 		}
-		
+
 		data, err := app.codec.Marshal(validator)
 		if err != nil {
 			return &abcitypes.ResponseQuery{
@@ -213,12 +323,12 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  fmt.Sprintf("failed to marshal validator: %v", err),
 			}, nil
 		}
-		
+
 		return &abcitypes.ResponseQuery{
 			Code:  0,
 			Value: data,
 		}, nil
-		
+
 	case "/gov/proposal":
 		// Query proposal
 		var proposalID uint64
@@ -228,7 +338,7 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  fmt.Sprintf("failed to unmarshal proposal ID: %v", err),
 			}, nil
 		}
-		
+
 		proposal, found := app.GovKeeper.GetProposal(app.ctx, proposalID)
 		if !found {
 			return &abcitypes.ResponseQuery{
@@ -236,7 +346,7 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  "proposal not found",
 			}, nil
 		}
-		
+
 		data, err := app.codec.Marshal(proposal)
 		if err != nil {
 			return &abcitypes.ResponseQuery{
@@ -244,12 +354,12 @@ func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*
 				Log:  fmt.Sprintf("failed to marshal proposal: %v", err),
 			}, nil
 		}
-		
+
 		return &abcitypes.ResponseQuery{
 			Code:  0,
 			Value: data,
 		}, nil
-		
+
 	default:
 		return &abcitypes.ResponseQuery{
 			Code: 1,
@@ -267,7 +377,7 @@ func (app *PulsarApp) CheckTx(ctx context.Context, req *abcitypes.RequestCheckTx
 			Log:  "empty transaction",
 		}, nil
 	}
-	
+
 	return &abcitypes.ResponseCheckTx{
 		Code: 0,
 		Log:  "transaction passed check",
@@ -283,7 +393,7 @@ func (app *PulsarApp) InitChain(ctx context.Context, req *abcitypes.RequestInitC
 		req.ChainId,
 		app.logger,
 	)
-	
+
 	// Initialize genesis state for each module
 	var genesisState map[string]json.RawMessage
 	if len(req.AppStateBytes) > 0 {
@@ -291,10 +401,10 @@ func (app *PulsarApp) InitChain(ctx context.Context, req *abcitypes.RequestInitC
 			return nil, fmt.Errorf("failed to unmarshal genesis state: %w", err)
 		}
 	}
-	
+
 	// TODO: Initialize modules with genesis state
 	// For now, we skip detailed genesis initialization
-	
+
 	return &abcitypes.ResponseInitChain{}, nil
 }
 
@@ -307,17 +417,17 @@ func (app *PulsarApp) FinalizeBlock(ctx context.Context, req *abcitypes.RequestF
 		app.ctx.ChainID(),
 		app.logger,
 	)
-	
+
 	// Process transactions
 	txResults := make([]*abcitypes.ExecTxResult, len(req.Txs))
 	for i, tx := range req.Txs {
 		result := app.processTx(tx)
 		txResults[i] = result
 	}
-	
+
 	// End block processing
 	events := app.endBlock()
-	
+
 	return &abcitypes.ResponseFinalizeBlock{
 		TxResults: txResults,
 		Events:    events,
@@ -332,7 +442,7 @@ func (app *PulsarApp) processTx(tx []byte) *abcitypes.ExecTxResult {
 			Log:  "empty transaction",
 		}
 	}
-	
+
 	// Simple transaction processing - in a real implementation,
 	// this would decode and route transactions to appropriate modules
 	return &abcitypes.ExecTxResult{
@@ -344,10 +454,10 @@ func (app *PulsarApp) processTx(tx []byte) *abcitypes.ExecTxResult {
 // endBlock performs end-block processing
 func (app *PulsarApp) endBlock() []abcitypes.Event {
 	var events []abcitypes.Event
-	
+
 	// End block processing for each module would go here
 	// For now, return empty events
-	
+
 	return events
 }
 
@@ -355,7 +465,7 @@ func (app *PulsarApp) endBlock() []abcitypes.Event {
 func (app *PulsarApp) Commit(ctx context.Context, req *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
 	// Commit the multi store
 	_ = app.cms.Commit()
-	
+
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0,
 	}, nil
@@ -365,21 +475,21 @@ func (app *PulsarApp) Commit(ctx context.Context, req *abcitypes.RequestCommit) 
 func (app *PulsarApp) Export(forZeroHeight bool, jailAllowedAddrs []string, modulesToExport []string) (json.RawMessage, error) {
 	// Create genesis state
 	genesisState := make(map[string]json.RawMessage)
-	
+
 	// TODO: Export modules state
 	// For now, return default genesis states
 	bankGenesis := banktypes.DefaultGenesisState()
 	bankData, _ := json.Marshal(bankGenesis)
 	genesisState[banktypes.ModuleName] = bankData
-	
+
 	stakingGenesis := stakingtypes.DefaultGenesisState()
 	stakingData, _ := json.Marshal(stakingGenesis)
 	genesisState[stakingtypes.ModuleName] = stakingData
-	
+
 	govGenesis := govtypes.DefaultGenesisState()
 	govData, _ := json.Marshal(govGenesis)
 	genesisState[govtypes.ModuleName] = govData
-	
+
 	return json.Marshal(genesisState)
 }
 

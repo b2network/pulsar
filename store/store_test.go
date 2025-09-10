@@ -1,9 +1,10 @@
 package store
 
 import (
-	"github.com/b2network/pulsar/store/types"
 	"os"
 	"testing"
+
+	"github.com/b2network/pulsar/store/types"
 )
 
 func TestStoreBasicOperations(t *testing.T) {
