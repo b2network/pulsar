@@ -53,12 +53,6 @@ type Metadata struct {
 	Symbol      string      `json:"symbol"`
 }
 
-// DenomUnit represents a denomination unit with its exponent
-type DenomUnit struct {
-	Denom    string   `json:"denom"`
-	Exponent uint32   `json:"exponent"`
-	Aliases  []string `json:"aliases"`
-}
 
 // SendEnabled represents whether transfers are enabled for a denom
 type SendEnabled struct {

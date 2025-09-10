@@ -17,6 +17,10 @@ type Keeper struct {
 
 	// Module permissions
 	maccPerms map[string][]string
+	
+	// Sub-keepers
+	denomMetadata *DenomMetadataKeeper
+	supply        *SupplyKeeper
 }
 
 // NewKeeper creates a new bank keeper
@@ -36,6 +40,10 @@ func NewKeeper(
 		accountKeeper: accountKeeper,
 		maccPerms:     maccPerms,
 	}
+	
+	// Initialize sub-keepers
+	keeper.denomMetadata = NewDenomMetadataKeeper(keeper)
+	keeper.supply = NewSupplyKeeper(keeper)
 
 	return keeper
 }
@@ -548,4 +556,14 @@ func formatCoins(coins keepertypes.Coins) string {
 func KVStorePrefixIterator(store storetypes.KVStore, prefix []byte) storetypes.Iterator {
 	// In a real implementation, this would use our prefix store
 	return store.Iterator(prefix, nil)
+}
+
+// DenomMetadata returns the denomination metadata keeper
+func (k Keeper) DenomMetadata() *DenomMetadataKeeper {
+	return k.denomMetadata
+}
+
+// Supply returns the supply keeper
+func (k Keeper) Supply() *SupplyKeeper {
+	return k.supply
 }
