@@ -1,4 +1,5 @@
 BINARY_NAME=pulsard
+CLI_NAME=pulsarcli
 BUILD_DIR=build
 HOME_DIR=$(HOME)/.pulsar
 VERSION ?= $(shell git describe --tags --always --dirty)
@@ -13,6 +14,8 @@ build:
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	@go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/pulsard
+	@echo "Building $(CLI_NAME)..."
+	@go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(CLI_NAME) ./cmd/pulsarcli
 
 build-all:
 	@echo "Building for all platforms..."
@@ -26,6 +29,8 @@ build-all:
 install: build
 	@echo "Installing $(BINARY_NAME)..."
 	@go install -ldflags "$(LDFLAGS)" ./cmd/pulsard
+	@echo "Installing $(CLI_NAME)..."
+	@go install -ldflags "$(LDFLAGS)" ./cmd/pulsarcli
 
 init: build
 	@echo "Initializing node..."
