@@ -540,3 +540,35 @@ func GetRedelegationKey(delAddr []byte, valSrcAddr []byte, valDstAddr []byte) []
 func GetLastValidatorPowerKey(valAddr []byte) []byte {
 	return append(LastValidatorPowerKey, valAddr...)
 }
+
+// GetDelegatorDelegations returns delegations for a delegator (dummy implementation)
+func (k Keeper) GetDelegatorDelegations(ctx keepertypes.Context, delegatorAddr []byte) []interface{} {
+	// Dummy implementation - return empty list
+	return []interface{}{}
+}
+
+// GetUnbondingDelegations returns unbonding delegations for a delegator (dummy implementation)
+func (k Keeper) GetUnbondingDelegations(ctx keepertypes.Context, delegatorAddr []byte) []interface{} {
+	// Dummy implementation - return empty list
+	return []interface{}{}
+}
+
+// GetRedelegations returns redelegations for a delegator (dummy implementation)
+func (k Keeper) GetRedelegations(ctx keepertypes.Context, delegatorAddr []byte) []interface{} {
+	// Dummy implementation - return empty list
+	return []interface{}{}
+}
+
+// GetPool returns the staking pool (dummy implementation)
+func (k Keeper) GetPool(ctx keepertypes.Context) interface{} {
+	// Dummy implementation - return empty pool
+	return map[string]interface{}{
+		"not_bonded_tokens": "0",
+		"bonded_tokens":     "0",
+	}
+}
+
+// Querier returns a new querier for the staking module
+func (k Keeper) Querier() keepertypes.ModuleQuerier {
+	return NewQuerier(&k)
+}

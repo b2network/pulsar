@@ -567,3 +567,8 @@ func (k Keeper) DenomMetadata() *DenomMetadataKeeper {
 func (k Keeper) Supply() *SupplyKeeper {
 	return k.supply
 }
+
+// Querier returns a new querier for the bank module
+func (k Keeper) Querier() keepertypes.ModuleQuerier {
+	return NewQuerier(&k)
+}

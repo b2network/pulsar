@@ -49,6 +49,9 @@ type PulsarApp struct {
 	// Pre-execution components
 	PreExecManager *preexeckeeper.PreExecutionManager
 
+	// Query router
+	queryRouter *keepertypes.QueryRouter
+
 	// Store keys
 	keys map[string]storetypes.StoreKey
 
@@ -166,6 +169,20 @@ func (app *PulsarApp) initKeepers() {
 		app.StakingKeeper,   // staking keeper for voting power
 		govtypes.ModuleName, // authority
 	)
+
+	// Initialize query router
+	app.initQueryRouter()
+}
+
+// initQueryRouter initializes the query router with module queriers
+func (app *PulsarApp) initQueryRouter() {
+	app.queryRouter = keepertypes.NewQueryRouter()
+	
+	// Register module queriers
+	app.queryRouter.
+		AddRoute(banktypes.ModuleName, app.BankKeeper.Querier()).
+		AddRoute(stakingtypes.ModuleName, app.StakingKeeper.Querier()).
+		AddRoute(govtypes.ModuleName, app.GovKeeper.Querier())
 }
 
 // initPreExecution sets up the pre-execution system
@@ -271,101 +288,16 @@ func (app *PulsarApp) Info(ctx context.Context, req *abcitypes.RequestInfo) (*ab
 
 // Query implements ABCI Query method
 func (app *PulsarApp) Query(ctx context.Context, req *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
-	path := req.Path
-
-	switch path {
-	case "/bank/balance":
-		// Query bank balance
-		var addr []byte
-		if err := app.codec.Unmarshal(req.Data, &addr); err != nil {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  fmt.Sprintf("failed to unmarshal address: %v", err),
-			}, nil
-		}
-
-		balance := app.BankKeeper.GetBalance(app.ctx, addr, "stake")
-		data, err := app.codec.Marshal(balance)
-		if err != nil {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  fmt.Sprintf("failed to marshal balance: %v", err),
-			}, nil
-		}
-
-		return &abcitypes.ResponseQuery{
-			Code:  0,
-			Value: data,
-		}, nil
-
-	case "/staking/validator":
-		// Query validator info
-		var addr []byte
-		if err := app.codec.Unmarshal(req.Data, &addr); err != nil {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  fmt.Sprintf("failed to unmarshal validator address: %v", err),
-			}, nil
-		}
-
-		validator, found := app.StakingKeeper.GetValidator(app.ctx, addr)
-		if !found {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  "validator not found",
-			}, nil
-		}
-
-		data, err := app.codec.Marshal(validator)
-		if err != nil {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  fmt.Sprintf("failed to marshal validator: %v", err),
-			}, nil
-		}
-
-		return &abcitypes.ResponseQuery{
-			Code:  0,
-			Value: data,
-		}, nil
-
-	case "/gov/proposal":
-		// Query proposal
-		var proposalID uint64
-		if err := app.codec.Unmarshal(req.Data, &proposalID); err != nil {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  fmt.Sprintf("failed to unmarshal proposal ID: %v", err),
-			}, nil
-		}
-
-		proposal, found := app.GovKeeper.GetProposal(app.ctx, proposalID)
-		if !found {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  "proposal not found",
-			}, nil
-		}
-
-		data, err := app.codec.Marshal(proposal)
-		if err != nil {
-			return &abcitypes.ResponseQuery{
-				Code: 1,
-				Log:  fmt.Sprintf("failed to marshal proposal: %v", err),
-			}, nil
-		}
-
-		return &abcitypes.ResponseQuery{
-			Code:  0,
-			Value: data,
-		}, nil
-
-	default:
-		return &abcitypes.ResponseQuery{
-			Code: 1,
-			Log:  fmt.Sprintf("unknown query path: %s", path),
-		}, nil
+	// Use the query router to handle all queries
+	if app.queryRouter != nil {
+		return app.queryRouter.Route(app.ctx, req.Path, *req)
 	}
+	
+	// Fallback if router is not initialized
+	return &abcitypes.ResponseQuery{
+		Code: 1,
+		Log:  "query router not initialized",
+	}, nil
 }
 
 // CheckTx implements ABCI CheckTx method

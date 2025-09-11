@@ -514,3 +514,25 @@ func formatCoins(coins []keepertypes.Coin) string {
 	}
 	return result
 }
+
+// GetAllProposals returns all proposals (dummy implementation)
+func (k Keeper) GetAllProposals(ctx keepertypes.Context) []interface{} {
+	// Dummy implementation - return empty list
+	return []interface{}{}
+}
+
+// GetTallyResult returns tally result for a proposal (dummy implementation)
+func (k Keeper) GetTallyResult(ctx keepertypes.Context, proposalID uint64) interface{} {
+	// Dummy implementation - return empty tally
+	return map[string]interface{}{
+		"yes":        "0",
+		"abstain":    "0", 
+		"no":         "0",
+		"no_with_veto": "0",
+	}
+}
+
+// Querier returns a new querier for the gov module
+func (k Keeper) Querier() keepertypes.ModuleQuerier {
+	return NewQuerier(&k)
+}
