@@ -3,61 +3,52 @@ package keeper
 import (
 	"fmt"
 
+	abcitypes "github.com/cometbft/cometbft/abci/types"
+
 	"github.com/b2network/pulsar/keeper/base"
 	keepertypes "github.com/b2network/pulsar/keeper/types"
 	"github.com/b2network/pulsar/modules/bank/types"
+	coinkeeper "github.com/b2network/pulsar/modules/coin/keeper"
+	cointypes "github.com/b2network/pulsar/modules/coin/types"
 	storetypes "github.com/b2network/pulsar/store/types"
 )
 
-// Keeper implements the bank keeper
-type Keeper struct {
+// RefactoredKeeper implements the bank keeper with coin module integration
+type RefactoredKeeper struct {
 	*base.KVStoreKeeper
 
 	accountKeeper types.AccountKeeper
-
-	// Module permissions
-	maccPerms map[string][]string
 	
-	// Sub-keepers
-	denomMetadata *DenomMetadataKeeper
-	supply        *SupplyKeeper
+	// Coin keeper for supply and metadata management
+	coinKeeper coinkeeper.CoinKeeper
 }
 
-// NewKeeper creates a new bank keeper
-func NewKeeper(
+// NewRefactoredKeeper creates a new refactored bank keeper
+func NewRefactoredKeeper(
 	storeKey storetypes.StoreKey,
 	codec keepertypes.Codec,
 	accountKeeper types.AccountKeeper,
-	maccPerms map[string][]string,
-) *Keeper {
-	// Ensure the module account permissions are valid
-	if maccPerms == nil {
-		maccPerms = make(map[string][]string)
-	}
-
-	keeper := &Keeper{
+	coinKeeper coinkeeper.CoinKeeper,
+) *RefactoredKeeper {
+	keeper := &RefactoredKeeper{
 		KVStoreKeeper: base.NewKVStoreKeeper(storeKey, codec),
 		accountKeeper: accountKeeper,
-		maccPerms:     maccPerms,
+		coinKeeper:    coinKeeper,
 	}
-	
-	// Initialize sub-keepers
-	keeper.denomMetadata = NewDenomMetadataKeeper(keeper)
-	keeper.supply = NewSupplyKeeper(keeper)
 
 	return keeper
 }
 
-// Key prefixes for different types of data
+// Key prefixes for bank-specific data (balances and send enabled)
 var (
 	BalancesPrefix      = []byte{0x02}
-	SupplyPrefix        = []byte{0x00}
-	DenomMetadataPrefix = []byte{0x1}
 	SendEnabledPrefix   = []byte{0x03}
 )
 
+// Balance operations (core bank functionality)
+
 // GetBalance returns the balance of a specific denomination for an address
-func (k Keeper) GetBalance(ctx keepertypes.Context, addr []byte, denom string) int64 {
+func (k RefactoredKeeper) GetBalance(ctx keepertypes.Context, addr []byte, denom string) int64 {
 	store := k.GetKVStore(ctx)
 	key := createBalanceKey(addr, denom)
 
@@ -74,12 +65,16 @@ func (k Keeper) GetBalance(ctx keepertypes.Context, addr []byte, denom string) i
 	return balance.Amount
 }
 
-// SetBalance sets the balance of a specific denomination for an address
-func (k Keeper) SetBalance(ctx keepertypes.Context, addr []byte, balance types.Balance) {
+// SetBalance sets the balance for an address and denomination
+func (k RefactoredKeeper) SetBalance(ctx keepertypes.Context, addr []byte, balance types.Balance) {
+	if err := k.ValidateBalance(balance); err != nil {
+		panic(fmt.Errorf("invalid balance: %w", err))
+	}
+
 	store := k.GetKVStore(ctx)
 	key := createBalanceKey(addr, balance.Denom)
 
-	if balance.Amount <= 0 {
+	if balance.Amount == 0 {
 		store.Delete(key)
 		return
 	}
@@ -90,24 +85,14 @@ func (k Keeper) SetBalance(ctx keepertypes.Context, addr []byte, balance types.B
 	}
 
 	store.Set(key, bz)
-
-	// Emit balance change event
-	k.EmitEvent(ctx, keepertypes.Event{
-		Type: types.EventTypeCoinReceived,
-		Attributes: []keepertypes.Attribute{
-			{Key: types.AttributeKeyReceiver, Value: balance.Address},
-			{Key: types.AttributeKeyAmount, Value: fmt.Sprintf("%d%s", balance.Amount, balance.Denom)},
-		},
-	})
 }
 
 // GetAllBalances returns all balances for an address
-func (k Keeper) GetAllBalances(ctx keepertypes.Context, addr []byte) []types.Balance {
+func (k RefactoredKeeper) GetAllBalances(ctx keepertypes.Context, addr []byte) []types.Balance {
 	var balances []types.Balance
 
 	store := k.GetKVStore(ctx)
 	prefix := createBalancePrefix(addr)
-
 	iterator := store.Iterator(prefix, nil)
 	defer iterator.Close()
 
@@ -122,71 +107,18 @@ func (k Keeper) GetAllBalances(ctx keepertypes.Context, addr []byte) []types.Bal
 	return balances
 }
 
-// GetSupply returns the total supply of a denomination
-func (k Keeper) GetSupply(ctx keepertypes.Context, denom string) int64 {
-	store := k.GetKVStore(ctx)
-	key := createSupplyKey(denom)
+// Transfer operations
 
-	bz := store.Get(key)
-	if bz == nil {
-		return 0
-	}
-
-	var supply types.Supply
-	if err := k.GetCodec().Unmarshal(bz, &supply); err != nil {
-		return 0
-	}
-
-	return supply.Amount
-}
-
-// SetSupply sets the total supply of a denomination
-func (k Keeper) SetSupply(ctx keepertypes.Context, supply types.Supply) {
-	store := k.GetKVStore(ctx)
-	key := createSupplyKey(supply.Denom)
-
-	if supply.Amount <= 0 {
-		store.Delete(key)
-		return
-	}
-
-	bz, err := k.GetCodec().Marshal(supply)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal supply: %w", err))
-	}
-
-	store.Set(key, bz)
-}
-
-// GetTotalSupply returns the total supply of all denominations
-func (k Keeper) GetTotalSupply(ctx keepertypes.Context) []types.Supply {
-	var supplies []types.Supply
-
-	store := k.GetKVStore(ctx)
-	iterator := store.Iterator(SupplyPrefix, nil)
-	defer iterator.Close()
-
-	for ; iterator.Valid(); iterator.Next() {
-		var supply types.Supply
-		if err := k.GetCodec().Unmarshal(iterator.Value(), &supply); err != nil {
-			continue
-		}
-		supplies = append(supplies, supply)
-	}
-
-	return supplies
-}
-
-// SendCoins transfers coins from one account to another
-func (k Keeper) SendCoins(ctx keepertypes.Context, fromAddr, toAddr []byte, amount keepertypes.Coins) error {
-	// Validate send is enabled for all coins
+// SendCoins transfers coins between two addresses
+func (k RefactoredKeeper) SendCoins(ctx keepertypes.Context, fromAddr, toAddr []byte, amount keepertypes.Coins) error {
+	// Validate send enabled for all coins
 	for _, coin := range amount {
 		if !k.IsSendEnabledCoin(ctx, coin) {
-			return fmt.Errorf("send disabled for denomination: %s", coin.Denom)
+			return fmt.Errorf("transfers are not enabled for %s", coin.Denom)
 		}
 	}
 
-	// Check sufficient balance
+	// Check sufficient balances
 	for _, coin := range amount {
 		balance := k.GetBalance(ctx, fromAddr, coin.Denom)
 		if balance < coin.Amount {
@@ -195,34 +127,31 @@ func (k Keeper) SendCoins(ctx keepertypes.Context, fromAddr, toAddr []byte, amou
 		}
 	}
 
-	// Subtract from sender
+	// Perform the transfer
 	for _, coin := range amount {
-		balance := k.GetBalance(ctx, fromAddr, coin.Denom)
-		newBalance := types.Balance{
+		// Subtract from sender
+		senderBalance := k.GetBalance(ctx, fromAddr, coin.Denom)
+		k.SetBalance(ctx, fromAddr, types.Balance{
 			Address: string(fromAddr),
 			Denom:   coin.Denom,
-			Amount:  balance - coin.Amount,
-		}
-		k.SetBalance(ctx, fromAddr, newBalance)
-	}
+			Amount:  senderBalance - coin.Amount,
+		})
 
-	// Add to recipient
-	for _, coin := range amount {
-		balance := k.GetBalance(ctx, toAddr, coin.Denom)
-		newBalance := types.Balance{
+		// Add to recipient
+		recipientBalance := k.GetBalance(ctx, toAddr, coin.Denom)
+		k.SetBalance(ctx, toAddr, types.Balance{
 			Address: string(toAddr),
 			Denom:   coin.Denom,
-			Amount:  balance + coin.Amount,
-		}
-		k.SetBalance(ctx, toAddr, newBalance)
+			Amount:  recipientBalance + coin.Amount,
+		})
 	}
 
 	// Emit transfer event
 	k.EmitEvent(ctx, keepertypes.Event{
 		Type: types.EventTypeTransfer,
 		Attributes: []keepertypes.Attribute{
-			{Key: types.AttributeKeySender, Value: string(fromAddr)},
 			{Key: types.AttributeKeyRecipient, Value: string(toAddr)},
+			{Key: types.AttributeKeySender, Value: string(fromAddr)},
 			{Key: types.AttributeKeyAmount, Value: formatCoins(amount)},
 		},
 	})
@@ -230,197 +159,169 @@ func (k Keeper) SendCoins(ctx keepertypes.Context, fromAddr, toAddr []byte, amou
 	return nil
 }
 
-// SendCoinsFromModuleToAccount transfers coins from module to account
-func (k Keeper) SendCoinsFromModuleToAccount(ctx keepertypes.Context, senderModule string, recipientAddr []byte, amount keepertypes.Coins) error {
-	// Handle nil account keeper for testing examples
-	if k.accountKeeper == nil {
-		return fmt.Errorf("account keeper not available in example")
-	}
-
-	senderAddr := k.accountKeeper.GetModuleAddress(senderModule)
-	if senderAddr == nil {
-		return fmt.Errorf("module address not found: %s", senderModule)
-	}
-
-	return k.SendCoins(ctx, senderAddr, recipientAddr, amount)
-}
-
-// SendCoinsFromAccountToModule transfers coins from account to module
-func (k Keeper) SendCoinsFromAccountToModule(ctx keepertypes.Context, senderAddr []byte, recipientModule string, amount keepertypes.Coins) error {
-	// Handle nil account keeper for testing examples
-	if k.accountKeeper == nil {
-		return fmt.Errorf("account keeper not available in example")
-	}
-
-	recipientAddr := k.accountKeeper.GetModuleAddress(recipientModule)
-	if recipientAddr == nil {
-		return fmt.Errorf("module address not found: %s", recipientModule)
-	}
-
-	return k.SendCoins(ctx, senderAddr, recipientAddr, amount)
-}
-
-// SendCoinsFromModuleToModule transfers coins from one module to another
-func (k Keeper) SendCoinsFromModuleToModule(ctx keepertypes.Context, senderModule, recipientModule string, amount keepertypes.Coins) error {
-	// Handle nil account keeper for testing examples
-	if k.accountKeeper == nil {
-		return fmt.Errorf("account keeper not available in example")
-	}
-
-	senderAddr := k.accountKeeper.GetModuleAddress(senderModule)
-	recipientAddr := k.accountKeeper.GetModuleAddress(recipientModule)
-
-	if senderAddr == nil {
-		return fmt.Errorf("sender module address not found: %s", senderModule)
-	}
-	if recipientAddr == nil {
-		return fmt.Errorf("recipient module address not found: %s", recipientModule)
-	}
-
-	return k.SendCoins(ctx, senderAddr, recipientAddr, amount)
-}
+// Mint and Burn operations (delegated to coin module)
 
 // MintCoins creates new coins and adds them to a module account
-func (k Keeper) MintCoins(ctx keepertypes.Context, moduleName string, amount keepertypes.Coins) error {
-	// Check module has minting permission
-	if !k.hasPermission(moduleName, "minter") {
-		return fmt.Errorf("module %s does not have minting permission", moduleName)
+func (k RefactoredKeeper) MintCoins(ctx keepertypes.Context, moduleName string, amount keepertypes.Coins) error {
+	// Delegate to coin keeper for supply management
+	if err := k.coinKeeper.MintCoins(ctx, moduleName, amount); err != nil {
+		return err
 	}
 
-	// Handle nil account keeper for testing examples
-	if k.accountKeeper == nil {
-		// For examples, simulate minting by updating supply only
+	// Handle account keeper operations if available
+	if k.accountKeeper != nil {
+		moduleAddr := k.accountKeeper.GetModuleAddress(moduleName)
+		if moduleAddr == nil {
+			return fmt.Errorf("module address not found: %s", moduleName)
+		}
+
+		// Add minted coins to module account balance
 		for _, coin := range amount {
-			// Update total supply
-			supply := k.GetSupply(ctx, coin.Denom)
-			newSupply := types.Supply{
-				Denom:  coin.Denom,
-				Amount: supply + coin.Amount,
-			}
-			k.SetSupply(ctx, newSupply)
+			balance := k.GetBalance(ctx, moduleAddr, coin.Denom)
+			k.SetBalance(ctx, moduleAddr, types.Balance{
+				Address: string(moduleAddr),
+				Denom:   coin.Denom,
+				Amount:  balance + coin.Amount,
+			})
 		}
-		return nil
 	}
-
-	moduleAddr := k.accountKeeper.GetModuleAddress(moduleName)
-	if moduleAddr == nil {
-		return fmt.Errorf("module address not found: %s", moduleName)
-	}
-
-	// Add coins to module account
-	for _, coin := range amount {
-		balance := k.GetBalance(ctx, moduleAddr, coin.Denom)
-		newBalance := types.Balance{
-			Address: string(moduleAddr),
-			Denom:   coin.Denom,
-			Amount:  balance + coin.Amount,
-		}
-		k.SetBalance(ctx, moduleAddr, newBalance)
-
-		// Update total supply
-		supply := k.GetSupply(ctx, coin.Denom)
-		newSupply := types.Supply{
-			Denom:  coin.Denom,
-			Amount: supply + coin.Amount,
-		}
-		k.SetSupply(ctx, newSupply)
-	}
-
-	// Emit mint event
-	k.EmitEvent(ctx, keepertypes.Event{
-		Type: types.EventTypeCoinMint,
-		Attributes: []keepertypes.Attribute{
-			{Key: types.AttributeKeyMinter, Value: moduleName},
-			{Key: types.AttributeKeyAmount, Value: formatCoins(amount)},
-		},
-	})
 
 	return nil
 }
 
 // BurnCoins removes coins from a module account
-func (k Keeper) BurnCoins(ctx keepertypes.Context, moduleName string, amount keepertypes.Coins) error {
-	// Check module has burning permission
-	if !k.hasPermission(moduleName, "burner") {
-		return fmt.Errorf("module %s does not have burning permission", moduleName)
-	}
+func (k RefactoredKeeper) BurnCoins(ctx keepertypes.Context, moduleName string, amount keepertypes.Coins) error {
+	// Handle account keeper operations if available
+	if k.accountKeeper != nil {
+		moduleAddr := k.accountKeeper.GetModuleAddress(moduleName)
+		if moduleAddr == nil {
+			return fmt.Errorf("module address not found: %s", moduleName)
+		}
 
-	// Handle nil account keeper for testing examples
-	if k.accountKeeper == nil {
-		// For examples, simulate burning by updating supply only
+		// Check sufficient balance and remove from module account
 		for _, coin := range amount {
-			// Update total supply
-			supply := k.GetSupply(ctx, coin.Denom)
-			newSupply := types.Supply{
-				Denom:  coin.Denom,
-				Amount: supply - coin.Amount,
+			balance := k.GetBalance(ctx, moduleAddr, coin.Denom)
+			if balance < coin.Amount {
+				return fmt.Errorf("insufficient funds to burn: need %d%s, have %d%s",
+					coin.Amount, coin.Denom, balance, coin.Denom)
 			}
-			k.SetSupply(ctx, newSupply)
-		}
-		return nil
-	}
 
-	moduleAddr := k.accountKeeper.GetModuleAddress(moduleName)
-	if moduleAddr == nil {
-		return fmt.Errorf("module address not found: %s", moduleName)
-	}
-
-	// Check sufficient balance
-	for _, coin := range amount {
-		balance := k.GetBalance(ctx, moduleAddr, coin.Denom)
-		if balance < coin.Amount {
-			return fmt.Errorf("insufficient funds to burn: need %d%s, have %d%s",
-				coin.Amount, coin.Denom, balance, coin.Denom)
+			k.SetBalance(ctx, moduleAddr, types.Balance{
+				Address: string(moduleAddr),
+				Denom:   coin.Denom,
+				Amount:  balance - coin.Amount,
+			})
 		}
 	}
 
-	// Remove coins from module account
-	for _, coin := range amount {
-		balance := k.GetBalance(ctx, moduleAddr, coin.Denom)
-		newBalance := types.Balance{
-			Address: string(moduleAddr),
-			Denom:   coin.Denom,
-			Amount:  balance - coin.Amount,
-		}
-		k.SetBalance(ctx, moduleAddr, newBalance)
-
-		// Update total supply
-		supply := k.GetSupply(ctx, coin.Denom)
-		newSupply := types.Supply{
-			Denom:  coin.Denom,
-			Amount: supply - coin.Amount,
-		}
-		k.SetSupply(ctx, newSupply)
-	}
-
-	// Emit burn event
-	k.EmitEvent(ctx, keepertypes.Event{
-		Type: types.EventTypeCoinBurn,
-		Attributes: []keepertypes.Attribute{
-			{Key: types.AttributeKeyBurner, Value: moduleName},
-			{Key: types.AttributeKeyAmount, Value: formatCoins(amount)},
-		},
-	})
-
-	return nil
+	// Delegate to coin keeper for supply management
+	return k.coinKeeper.BurnCoins(ctx, moduleName, amount)
 }
 
-// ValidateBalance validates a balance object
-func (k Keeper) ValidateBalance(balance types.Balance) error {
-	if balance.Address == "" {
-		return fmt.Errorf("address cannot be empty")
+// Supply operations (delegated to coin module)
+
+// GetSupply returns the total supply of a denomination
+func (k RefactoredKeeper) GetSupply(ctx keepertypes.Context, denom string) int64 {
+	supply := k.coinKeeper.GetSupply(ctx, denom)
+	// Convert coin module supply to int64 for backward compatibility
+	// In a real implementation, we'd want to handle big.Int properly
+	// For now, assuming the amount can be parsed as int64
+	if amount, err := fmt.Sscanf(supply.Amount, "%d"); err == nil && amount > 0 {
+		return int64(amount)
 	}
-	if balance.Denom == "" {
-		return fmt.Errorf("denom cannot be empty")
-	}
-	if balance.Amount < 0 {
-		return fmt.Errorf("amount cannot be negative")
-	}
-	return nil
+	return 0
 }
+
+// SetSupply sets the total supply of a denomination
+func (k RefactoredKeeper) SetSupply(ctx keepertypes.Context, supply types.Supply) {
+	coinSupply := cointypes.NewSupply(supply.Denom, fmt.Sprintf("%d", supply.Amount))
+	k.coinKeeper.SetSupply(ctx, coinSupply)
+}
+
+// Metadata operations (delegated to coin module)
+
+// GetDenomMetadata returns metadata for a denomination
+func (k RefactoredKeeper) GetDenomMetadata(ctx keepertypes.Context, denom string) (types.Metadata, bool) {
+	coinMetadata, found := k.coinKeeper.GetMetadata(ctx, denom)
+	if !found {
+		return types.Metadata{}, false
+	}
+
+	// Convert coin module metadata to bank module metadata
+	bankMetadata := types.Metadata{
+		Description: coinMetadata.Description,
+		Base:        coinMetadata.Base,
+		Display:     coinMetadata.Display,
+		Name:        coinMetadata.Name,
+		Symbol:      coinMetadata.Symbol,
+		DenomUnits:  make([]types.DenomUnit, len(coinMetadata.DenomUnits)),
+	}
+
+	for i, unit := range coinMetadata.DenomUnits {
+		bankMetadata.DenomUnits[i] = types.DenomUnit{
+			Denom:    unit.Denom,
+			Exponent: unit.Exponent,
+			Aliases:  unit.Aliases,
+		}
+	}
+
+	return bankMetadata, true
+}
+
+// SetDenomMetadata sets metadata for a denomination
+func (k RefactoredKeeper) SetDenomMetadata(ctx keepertypes.Context, metadata types.Metadata) error {
+	// Convert bank module metadata to coin module metadata
+	coinMetadata := cointypes.NewMetadata(
+		metadata.Description,
+		metadata.Base,
+		metadata.Display,
+		metadata.Name,
+		metadata.Symbol,
+		make([]cointypes.DenomUnit, len(metadata.DenomUnits)),
+	)
+
+	for i, unit := range metadata.DenomUnits {
+		coinMetadata.DenomUnits[i] = cointypes.DenomUnit{
+			Denom:    unit.Denom,
+			Exponent: unit.Exponent,
+			Aliases:  unit.Aliases,
+		}
+	}
+
+	return k.coinKeeper.SetMetadata(ctx, coinMetadata)
+}
+
+// GetAllDenomMetadata returns all denomination metadata
+func (k RefactoredKeeper) GetAllDenomMetadata(ctx keepertypes.Context) []types.Metadata {
+	coinMetadatas := k.coinKeeper.GetAllMetadata(ctx)
+	bankMetadatas := make([]types.Metadata, len(coinMetadatas))
+
+	for i, coinMetadata := range coinMetadatas {
+		bankMetadatas[i] = types.Metadata{
+			Description: coinMetadata.Description,
+			Base:        coinMetadata.Base,
+			Display:     coinMetadata.Display,
+			Name:        coinMetadata.Name,
+			Symbol:      coinMetadata.Symbol,
+			DenomUnits:  make([]types.DenomUnit, len(coinMetadata.DenomUnits)),
+		}
+
+		for j, unit := range coinMetadata.DenomUnits {
+			bankMetadatas[i].DenomUnits[j] = types.DenomUnit{
+				Denom:    unit.Denom,
+				Exponent: unit.Exponent,
+				Aliases:  unit.Aliases,
+			}
+		}
+	}
+
+	return bankMetadatas
+}
+
+// Bank-specific functionality (send enabled)
 
 // IsSendEnabledCoin checks if transfers are enabled for a coin
-func (k Keeper) IsSendEnabledCoin(ctx keepertypes.Context, coin keepertypes.Coin) bool {
+func (k RefactoredKeeper) IsSendEnabledCoin(ctx keepertypes.Context, coin keepertypes.Coin) bool {
 	store := k.GetKVStore(ctx)
 	key := createSendEnabledKey(coin.Denom)
 
@@ -440,7 +341,7 @@ func (k Keeper) IsSendEnabledCoin(ctx keepertypes.Context, coin keepertypes.Coin
 }
 
 // GetParams returns the parameters for the bank module
-func (k Keeper) GetParams(ctx keepertypes.Context) types.Params {
+func (k RefactoredKeeper) GetParams(ctx keepertypes.Context) types.Params {
 	var params types.Params
 	if err := k.GetObject(ctx, []byte("params"), &params); err != nil {
 		return types.DefaultParams()
@@ -449,64 +350,78 @@ func (k Keeper) GetParams(ctx keepertypes.Context) types.Params {
 }
 
 // SetParams sets the parameters for the bank module
-func (k Keeper) SetParams(ctx keepertypes.Context, params types.Params) {
+func (k RefactoredKeeper) SetParams(ctx keepertypes.Context, params types.Params) {
 	if err := k.SetObject(ctx, []byte("params"), params); err != nil {
 		panic(fmt.Errorf("failed to set params: %w", err))
 	}
 }
 
-// GetDenomMetadata returns metadata for a denomination
-func (k Keeper) GetDenomMetadata(ctx keepertypes.Context, denom string) (types.Metadata, bool) {
-	store := k.GetKVStore(ctx)
-	key := createDenomMetadataKey(denom)
-
-	bz := store.Get(key)
-	if bz == nil {
-		return types.Metadata{}, false
+// ValidateBalance validates a balance object
+func (k RefactoredKeeper) ValidateBalance(balance types.Balance) error {
+	if balance.Address == "" {
+		return fmt.Errorf("address cannot be empty")
 	}
-
-	var metadata types.Metadata
-	if err := k.GetCodec().Unmarshal(bz, &metadata); err != nil {
-		return types.Metadata{}, false
+	if balance.Denom == "" {
+		return fmt.Errorf("denom cannot be empty")
 	}
-
-	return metadata, true
+	if balance.Amount < 0 {
+		return fmt.Errorf("amount cannot be negative")
+	}
+	return nil
 }
 
-// SetDenomMetadata sets metadata for a denomination
-func (k Keeper) SetDenomMetadata(ctx keepertypes.Context, metadata types.Metadata) {
-	store := k.GetKVStore(ctx)
-	key := createDenomMetadataKey(metadata.Base)
-
-	bz, err := k.GetCodec().Marshal(metadata)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal metadata: %w", err))
-	}
-
-	store.Set(key, bz)
+// Querier returns a new querier for the bank module
+func (k RefactoredKeeper) Querier() keepertypes.ModuleQuerier {
+	// For now, create a simple querier that delegates to the coin module
+	// In a full implementation, we'd create a proper bank querier
+	return &bankRefactoredQuerier{keeper: &k}
 }
 
-// GetAllDenomMetadata returns all denomination metadata
-func (k Keeper) GetAllDenomMetadata(ctx keepertypes.Context) []types.Metadata {
-	var metadata []types.Metadata
+// bankRefactoredQuerier implements basic bank queries
+type bankRefactoredQuerier struct {
+	keeper *RefactoredKeeper
+}
 
-	store := k.GetKVStore(ctx)
-	iterator := store.Iterator(DenomMetadataPrefix, nil)
-	defer iterator.Close()
+func (q *bankRefactoredQuerier) Query(ctx keepertypes.Context, path []string, req abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
+	if len(path) == 0 {
+		return keepertypes.QueryError(1, "no query specified"), nil
+	}
 
-	for ; iterator.Valid(); iterator.Next() {
-		var meta types.Metadata
-		if err := k.GetCodec().Unmarshal(iterator.Value(), &meta); err != nil {
-			continue
+	switch path[0] {
+	case "balance":
+		if len(path) < 3 {
+			return keepertypes.QueryError(1, "address and denom required"), nil
 		}
-		metadata = append(metadata, meta)
+		addr := []byte(path[1])
+		denom := path[2]
+		balance := q.keeper.GetBalance(ctx, addr, denom)
+		
+		data, err := q.keeper.GetCodec().Marshal(map[string]interface{}{
+			"address": string(addr),
+			"denom":   denom,
+			"amount":  balance,
+		})
+		if err != nil {
+			return keepertypes.QueryError(1, "failed to marshal balance: %v", err), nil
+		}
+		
+		return keepertypes.QuerySuccess(data), nil
+	default:
+		return keepertypes.QueryError(1, "unknown bank query: %s", path[0]), nil
 	}
+}
 
-	return metadata
+func (q *bankRefactoredQuerier) RegisterQueryRoutes() map[string]keepertypes.QueryHandler {
+	return map[string]keepertypes.QueryHandler{
+		"balance": q.handleBalance,
+	}
+}
+
+func (q *bankRefactoredQuerier) handleBalance(ctx keepertypes.Context, path []string, req abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
+	return q.Query(ctx, path, req)
 }
 
 // Helper functions
-
 func createBalanceKey(addr []byte, denom string) []byte {
 	return append(createBalancePrefix(addr), []byte(denom)...)
 }
@@ -515,30 +430,36 @@ func createBalancePrefix(addr []byte) []byte {
 	return append(BalancesPrefix, addr...)
 }
 
-func createSupplyKey(denom string) []byte {
-	return append(SupplyPrefix, []byte(denom)...)
-}
-
-func createDenomMetadataKey(denom string) []byte {
-	return append(DenomMetadataPrefix, []byte(denom)...)
-}
-
 func createSendEnabledKey(denom string) []byte {
 	return append(SendEnabledPrefix, []byte(denom)...)
 }
 
-func (k Keeper) hasPermission(moduleName, permission string) bool {
-	perms, exists := k.maccPerms[moduleName]
-	if !exists {
-		return false
+// SendCoinsFromAccountToModule transfers coins from an account to a module account
+func (k RefactoredKeeper) SendCoinsFromAccountToModule(ctx keepertypes.Context, senderAddr []byte, recipientModule string, amt keepertypes.Coins) error {
+	if k.accountKeeper == nil {
+		return fmt.Errorf("account keeper not available")
 	}
+	
+	moduleAddr := k.accountKeeper.GetModuleAddress(recipientModule)
+	if moduleAddr == nil {
+		return fmt.Errorf("module address not found: %s", recipientModule)
+	}
+	
+	return k.SendCoins(ctx, senderAddr, moduleAddr, amt)
+}
 
-	for _, perm := range perms {
-		if perm == permission {
-			return true
-		}
+// SendCoinsFromModuleToAccount transfers coins from a module account to an account
+func (k RefactoredKeeper) SendCoinsFromModuleToAccount(ctx keepertypes.Context, senderModule string, recipientAddr []byte, amt keepertypes.Coins) error {
+	if k.accountKeeper == nil {
+		return fmt.Errorf("account keeper not available")
 	}
-	return false
+	
+	moduleAddr := k.accountKeeper.GetModuleAddress(senderModule)
+	if moduleAddr == nil {
+		return fmt.Errorf("module address not found: %s", senderModule)
+	}
+	
+	return k.SendCoins(ctx, moduleAddr, recipientAddr, amt)
 }
 
 func formatCoins(coins keepertypes.Coins) string {
@@ -550,25 +471,4 @@ func formatCoins(coins keepertypes.Coins) string {
 		result += fmt.Sprintf("%d%s", coin.Amount, coin.Denom)
 	}
 	return result
-}
-
-// KVStorePrefixIterator creates a prefix iterator (placeholder implementation)
-func KVStorePrefixIterator(store storetypes.KVStore, prefix []byte) storetypes.Iterator {
-	// In a real implementation, this would use our prefix store
-	return store.Iterator(prefix, nil)
-}
-
-// DenomMetadata returns the denomination metadata keeper
-func (k Keeper) DenomMetadata() *DenomMetadataKeeper {
-	return k.denomMetadata
-}
-
-// Supply returns the supply keeper
-func (k Keeper) Supply() *SupplyKeeper {
-	return k.supply
-}
-
-// Querier returns a new querier for the bank module
-func (k Keeper) Querier() keepertypes.ModuleQuerier {
-	return NewQuerier(&k)
 }
