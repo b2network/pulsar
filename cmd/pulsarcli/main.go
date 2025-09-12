@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	
 	bankcli "github.com/b2network/pulsar/modules/bank/client/cli"
+	coincli "github.com/b2network/pulsar/modules/coin/client/cli"
 )
 
 var (
@@ -72,6 +73,7 @@ func txCmd() *cobra.Command {
 	// Add module tx commands
 	cmd.AddCommand(
 		bankcli.GetTxCmd(),
+		coincli.GetTxCmd(),
 		// Future: Add other module tx commands here
 		// stakingcli.GetTxCmd(),
 		// govcli.GetTxCmd(),
@@ -93,6 +95,7 @@ func queryCmd() *cobra.Command {
 	// Add module query commands
 	cmd.AddCommand(
 		bankcli.GetQueryCmd(),
+		coincli.GetQueryCmd(),
 		// Future: Add other module query commands here
 		// stakingcli.GetQueryCmd(),
 		// govcli.GetQueryCmd(),
