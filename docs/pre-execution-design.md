@@ -146,12 +146,12 @@ type PreExecutableMsg interface {
 // Module interface with pre-execution capabilities
 type PreExecutableModule interface {
     Module
-    
+
     // Pre-execution methods
     PreExecuteMsg(ctx Context, msg Msg) (*PreExecResult, error)
     ValidatePreExecResult(ctx Context, result *PreExecResult) error
     ApplyCachedResult(ctx Context, result *PreExecResult) error
-    
+
     // Configuration
     GetPreExecConfig() *ModulePreExecConfig
 }
@@ -320,7 +320,7 @@ modules/gov/
 ```go
 type PulsarApp struct {
     // Existing fields...
-    
+
     // Pre-execution additions
     preExecManager  *preexecution.Manager
     preExecCache    *preexecution.Cache
@@ -335,14 +335,14 @@ func (app *PulsarApp) CheckTx(ctx context.Context, req *RequestCheckTx) (*Respon
     if err != nil {
         return &ResponseCheckTx{Code: 1}, err
     }
-    
+
     // Check if pre-execution is needed
     if app.preExecManager.ShouldPreExecute(tx) {
         result, err := app.preExecManager.PreExecuteTx(app.ctx, tx)
         if err == nil {
             // Cache pre-execution result
             app.preExecManager.CacheResult(result)
-            
+
             // Return pre-execution status
             return &ResponseCheckTx{
                 Code: 0,
@@ -352,7 +352,7 @@ func (app *PulsarApp) CheckTx(ctx context.Context, req *RequestCheckTx) (*Respon
             }, nil
         }
     }
-    
+
     // Regular check
     return &ResponseCheckTx{Code: 0}, nil
 }
@@ -363,7 +363,7 @@ func (app *PulsarApp) CheckTx(ctx context.Context, req *RequestCheckTx) (*Respon
 func (app *PulsarApp) PrepareProposal(ctx context.Context, req *RequestPrepareProposal) (*ResponsePrepareProposal, error) {
     // Use pre-executed transactions from cache
     preExecutedTxs := app.preExecCache.GetOrderedTransactions()
-    
+
     // Apply cached results
     for _, cachedTx := range preExecutedTxs {
         if app.preExecManager.ValidateCachedResult(app.ctx, cachedTx) {
@@ -371,7 +371,7 @@ func (app *PulsarApp) PrepareProposal(ctx context.Context, req *RequestPreparePr
             app.preExecManager.ApplyCachedResult(app.ctx, cachedTx)
         }
     }
-    
+
     return &ResponsePrepareProposal{
         Txs: preExecutedTxs,
     }, nil
@@ -416,10 +416,10 @@ func (m *PreExecSyncManager) HandleOrderReceived(order PreExecutionOrder) error 
     if err := m.validateOrder(order); err != nil {
         return err
     }
-    
+
     // Update local sequence
     m.orders.AddOrder(order)
-    
+
     return nil
 }
 ```
@@ -454,7 +454,7 @@ type PreExecMetrics struct {
 
 2. **Pre-execution Phase (Validator)**
    ```
-   CheckTx → Pre-execute → Update to PreConfirm → 
+   CheckTx → Pre-execute → Update to PreConfirm →
    Move to preExecCache → Broadcast order(N-txhash-seq)
    ```
 
@@ -465,13 +465,13 @@ type PreExecMetrics struct {
 
 4. **Block Packing Phase**
    ```
-   PrepareProposal → Get from preExecCache in order → 
+   PrepareProposal → Get from preExecCache in order →
    Use cached results → Pack block
    ```
 
 5. **Confirmation Phase**
    ```
-   FinalizeBlock → Apply state changes → 
+   FinalizeBlock → Apply state changes →
    Clear preExecCache → Update to Confirmed
    ```
 
@@ -523,12 +523,12 @@ pre_execution:
   cache_ttl: 30s
   max_pre_exec_gas: 1000000
   memory_limit: 1GB
-  
+
   sequencer:
     broadcast_interval: 100ms
     sync_timeout: 5s
     max_pending_orders: 5000
-  
+
   modules:
     bank:
       enabled: true
@@ -541,7 +541,7 @@ pre_execution:
           enabled: true
           max_gas: 200000
           priority: 8
-    
+
     staking:
       enabled: true
       msgs:
@@ -552,7 +552,7 @@ pre_execution:
           requires_ordering: true
         MsgUndelegate:
           enabled: false
-    
+
     gov:
       enabled: true
       msgs:
