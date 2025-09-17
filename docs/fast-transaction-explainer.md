@@ -18,11 +18,7 @@ To understand the value of pre-confirmation technology, we first need to underst
 
 ### Traditional Blockchain Transaction Flow
 
-```
-Submit Transaction → Wait for Block Packing → Wait for Block Confirmation → Transaction Complete
-        ↓                    ↓                        ↓                          ↓
-       0s                  1-3s                     2-6s                       3-10s
-```
+![Traditional Blockchain Transaction Flow](https://github.com/user-attachments/assets/171645bc-af8d-4e10-871c-9ee2cc6db7a7)
 
 It's like mailing a letter:
 - You drop the letter in the mailbox (submit transaction)
