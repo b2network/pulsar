@@ -62,13 +62,7 @@ Although the actual cooking time hasn't changed, you get immediate feedback, gre
 
 ### Technical Principle (Simplified)
 
-```
-Traditional Flow:
-User → Submit Transaction → Wait 2-3s → Enter Block → Get Result
-
-Pre-confirmation Flow:
-User → Submit Transaction → Immediate Pre-execution (100ms) → Return Result → Background Block Entry
-```
+![Technical Principle](https://github.com/user-attachments/assets/aa71be80-f62f-4ed0-b4f9-13dae72bb987)
 
 ### Core Technical Architecture
 
