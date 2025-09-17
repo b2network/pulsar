@@ -228,29 +228,7 @@ type PreExecutionSequence struct {
 
 Let's illustrate the entire process with a simple example:
 
-```
-Scenario: Alice transfers 100 USDT to Bob
-
-1️⃣ Alice initiates transfer
-   ↓ (0 seconds)
-2️⃣ Transaction reaches validator node
-   ↓ (0.01 seconds)
-3️⃣ Node pre-executes transaction
-   - Check Alice's balance: ✅ Sufficient
-   - Simulate transfer operation: ✅ Success
-   - Generate execution result
-   ↓ (0.1 seconds)
-4️⃣ Return pre-confirmation result to Alice
-   "Transfer successful! Bob will receive 100 USDT"
-   ↓ (0.2 seconds)
-5️⃣ Alice sees success prompt, continues with other operations
-
---- Background Processing ---
-6️⃣ Transaction enters packing queue
-7️⃣ Packed into block (after 1-2 seconds)
-8️⃣ Block reaches consensus
-9️⃣ Final confirmation complete
-```
+![Pre-confirmation Technology Workflow](https://github.com/user-attachments/assets/951f664b-7221-4a49-964f-f80e6bff35fd)
 
 Alice gets feedback at step 4, the entire experience takes only 200 milliseconds!
 
