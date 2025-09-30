@@ -7,9 +7,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	
+
+	"github.com/b2network/pulsar/client/tx"
 	"github.com/b2network/pulsar/modules/coin/types"
 	keepertypes "github.com/b2network/pulsar/keeper/types"
+	commontypes "github.com/b2network/pulsar/types"
 )
 
 // GetTxCmd returns the transaction commands for the coin module
@@ -62,12 +64,14 @@ $ pulsarcli tx coin mint cosmos1... mint 500000ubtc,1000000wei
 				return err
 			}
 
-			// TODO: Sign and broadcast transaction
-			fmt.Printf("Minting %s coins for module %s\n", amountStr, module)
-			fmt.Printf("Authority: %s\n", authority)
-			fmt.Printf("Message created: %+v\n", msg)
+			// Prepare and execute transaction
+			msgs := []commontypes.Msg{msg}
+			txConfig := tx.TxCliConfig{
+				ChainID: "", // Will be derived from flags
+				HomeDir: "", // Will be derived from flags
+			}
 
-			return nil
+			return tx.PrepareAndExecuteTx(cmd, msgs, txConfig)
 		},
 	}
 
@@ -107,12 +111,14 @@ $ pulsarcli tx coin burn cosmos1... mint 500000ubtc,1000000wei
 				return err
 			}
 
-			// TODO: Sign and broadcast transaction
-			fmt.Printf("Burning %s coins from module %s\n", amountStr, module)
-			fmt.Printf("Authority: %s\n", authority)
-			fmt.Printf("Message created: %+v\n", msg)
+			// Prepare and execute transaction
+			msgs := []commontypes.Msg{msg}
+			txConfig := tx.TxCliConfig{
+				ChainID: "", // Will be derived from flags
+				HomeDir: "", // Will be derived from flags
+			}
 
-			return nil
+			return tx.PrepareAndExecuteTx(cmd, msgs, txConfig)
 		},
 	}
 
@@ -150,12 +156,14 @@ $ pulsarcli tx coin set-metadata cosmos1... '{"description":"Bitcoin","base":"ub
 				return err
 			}
 
-			// TODO: Sign and broadcast transaction
-			fmt.Printf("Setting metadata for %s\n", metadata.Base)
-			fmt.Printf("Authority: %s\n", authority)
-			fmt.Printf("Message created: %+v\n", msg)
+			// Prepare and execute transaction
+			msgs := []commontypes.Msg{msg}
+			txConfig := tx.TxCliConfig{
+				ChainID: "", // Will be derived from flags
+				HomeDir: "", // Will be derived from flags
+			}
 
-			return nil
+			return tx.PrepareAndExecuteTx(cmd, msgs, txConfig)
 		},
 	}
 
@@ -195,12 +203,14 @@ $ pulsarcli tx coin set-permissions cosmos1... gov mint
 				return err
 			}
 
-			// TODO: Sign and broadcast transaction
-			fmt.Printf("Setting permissions for module %s: %v\n", moduleName, permissions)
-			fmt.Printf("Authority: %s\n", authority)
-			fmt.Printf("Message created: %+v\n", msg)
+			// Prepare and execute transaction
+			msgs := []commontypes.Msg{msg}
+			txConfig := tx.TxCliConfig{
+				ChainID: "", // Will be derived from flags
+				HomeDir: "", // Will be derived from flags
+			}
 
-			return nil
+			return tx.PrepareAndExecuteTx(cmd, msgs, txConfig)
 		},
 	}
 
@@ -252,11 +262,5 @@ func parseCoins(coinsStr string) (keepertypes.Coins, error) {
 
 // addTxFlags adds common transaction flags
 func addTxFlags(cmd *cobra.Command) {
-	cmd.Flags().String("from", "", "Name or address of account that signs the transaction")
-	cmd.Flags().String("fees", "", "Fees to pay for the transaction")
-	cmd.Flags().String("gas", "auto", "Gas limit to set per-transaction")
-	cmd.Flags().String("gas-prices", "", "Gas prices to determine the transaction fee")
-	cmd.Flags().String("memo", "", "Memo to include in the transaction")
-	cmd.Flags().Bool("dry-run", false, "Perform a dry run without broadcasting")
-	cmd.Flags().Bool("generate-only", false, "Generate transaction without broadcasting")
+	tx.AddTxFlags(cmd)
 }

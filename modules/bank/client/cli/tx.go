@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	
+
+	"github.com/b2network/pulsar/client/tx"
 	"github.com/b2network/pulsar/modules/bank/types"
 	commontypes "github.com/b2network/pulsar/types"
 )
@@ -62,11 +63,14 @@ $ pulsarcli tx bank send addr1 addr2 100ubtc,50wei
 				return err
 			}
 
-			// TODO: Sign and broadcast transaction
-			fmt.Printf("Sending %s from %s to %s\n", amountStr, fromAddr, toAddr)
-			fmt.Printf("Message created: %+v\n", msg)
+			// Prepare and execute transaction
+			msgs := []commontypes.Msg{msg}
+			txConfig := tx.TxCliConfig{
+				ChainID: "", // Will be derived from flags
+				HomeDir: "", // Will be derived from flags
+			}
 
-			return nil
+			return tx.PrepareAndExecuteTx(cmd, msgs, txConfig)
 		},
 	}
 
@@ -117,12 +121,14 @@ $ pulsarcli tx bank multi-send addr1:100ubtc,addr2:50ubtc addr3:80ubtc,addr4:70u
 				return err
 			}
 
-			// TODO: Sign and broadcast transaction
-			fmt.Printf("Multi-send transaction created:\n")
-			fmt.Printf("Inputs: %v\n", inputs)
-			fmt.Printf("Outputs: %v\n", outputs)
+			// Prepare and execute transaction
+			msgs := []commontypes.Msg{msg}
+			txConfig := tx.TxCliConfig{
+				ChainID: "", // Will be derived from flags
+				HomeDir: "", // Will be derived from flags
+			}
 
-			return nil
+			return tx.PrepareAndExecuteTx(cmd, msgs, txConfig)
 		},
 	}
 
@@ -220,11 +226,5 @@ func calculateTotalCoins(inputs []types.Input, outputs []types.Output) commontyp
 
 // addTxFlags adds common transaction flags
 func addTxFlags(cmd *cobra.Command) {
-	cmd.Flags().String("from", "", "Name or address of account that signs the transaction")
-	cmd.Flags().String("fees", "", "Fees to pay for the transaction")
-	cmd.Flags().String("gas", "auto", "Gas limit to set per-transaction")
-	cmd.Flags().String("gas-prices", "", "Gas prices to determine the transaction fee")
-	cmd.Flags().String("memo", "", "Memo to include in the transaction")
-	cmd.Flags().Bool("dry-run", false, "Perform a dry run without broadcasting")
-	cmd.Flags().Bool("generate-only", false, "Generate transaction without broadcasting")
+	tx.AddTxFlags(cmd)
 }

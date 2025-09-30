@@ -18,9 +18,8 @@ func (m MsgSend) ValidateBasic() error {
 }
 
 // GetSigners returns the signers for MsgSend
-func (m MsgSend) GetSigners() [][]byte {
-	// Return signer addresses
-	return [][]byte{}
+func (m MsgSend) GetSigners() []string {
+	return []string{m.FromAddress}
 }
 
 // MsgMultiSend represents a message to send coins from multiple inputs to multiple outputs
@@ -49,7 +48,10 @@ func (m MsgMultiSend) ValidateBasic() error {
 }
 
 // GetSigners returns the signers for MsgMultiSend
-func (m MsgMultiSend) GetSigners() [][]byte {
-	// Return signer addresses
-	return [][]byte{}
+func (m MsgMultiSend) GetSigners() []string {
+	var signers []string
+	for _, input := range m.Inputs {
+		signers = append(signers, input.Address)
+	}
+	return signers
 }

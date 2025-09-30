@@ -5,9 +5,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	
+
 	bankcli "github.com/b2network/pulsar/modules/bank/client/cli"
 	coincli "github.com/b2network/pulsar/modules/coin/client/cli"
+	cryptocli "github.com/b2network/pulsar/crypto/client/cli"
 )
 
 var (
@@ -112,22 +113,7 @@ func queryCmd() *cobra.Command {
 
 // keysCmd returns the key management command
 func keysCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "keys",
-		Short: "Manage application keys",
-		Long:  `Keys management commands to manage local keys for signing transactions.`,
-	}
-
-	cmd.AddCommand(
-		keysAddCmd(),
-		keysListCmd(),
-		keysShowCmd(),
-		keysDeleteCmd(),
-		keysExportCmd(),
-		keysImportCmd(),
-	)
-
-	return cmd
+	return cryptocli.GetKeysCmd()
 }
 
 // versionCmd returns the version command
@@ -188,90 +174,6 @@ func queryBlockCmd() *cobra.Command {
 			}
 			fmt.Printf("Querying block at height: %s\n", height)
 			// TODO: Implement actual query
-			return nil
-		},
-	}
-}
-
-// Keys sub-commands
-func keysAddCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "add [name]",
-		Short: "Add a new key",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			fmt.Printf("Adding new key: %s\n", name)
-			// TODO: Implement key generation
-			return nil
-		},
-	}
-}
-
-func keysListCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List all keys",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("Listing all keys...")
-			// TODO: Implement key listing
-			return nil
-		},
-	}
-}
-
-func keysShowCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "show [name]",
-		Short: "Show key information",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			fmt.Printf("Showing key: %s\n", name)
-			// TODO: Implement key display
-			return nil
-		},
-	}
-}
-
-func keysDeleteCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "delete [name]",
-		Short: "Delete a key",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			fmt.Printf("Deleting key: %s\n", name)
-			// TODO: Implement key deletion
-			return nil
-		},
-	}
-}
-
-func keysExportCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "export [name]",
-		Short: "Export a key",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			fmt.Printf("Exporting key: %s\n", name)
-			// TODO: Implement key export
-			return nil
-		},
-	}
-}
-
-func keysImportCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "import [name] [file]",
-		Short: "Import a key from file",
-		Args:  cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			file := args[1]
-			fmt.Printf("Importing key %s from %s\n", name, file)
-			// TODO: Implement key import
 			return nil
 		},
 	}

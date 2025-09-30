@@ -6,7 +6,7 @@ type Msg interface {
 	ValidateBasic() error
 
 	// GetSigners returns the addresses that must sign the transaction
-	GetSigners() [][]byte
+	GetSigners() []string
 }
 
 // Event represents a blockchain event
