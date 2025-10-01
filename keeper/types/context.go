@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"github.com/b2network/pulsar/store/types"
 )
 
@@ -8,6 +10,7 @@ import (
 type PulsarContext struct {
 	multiStore   types.MultiStore
 	blockHeight  int64
+	blockTime    time.Time
 	chainID      string
 	logger       Logger
 	eventManager EventManager
@@ -23,6 +26,7 @@ func NewPulsarContext(
 	return &PulsarContext{
 		multiStore:   multiStore,
 		blockHeight:  blockHeight,
+		blockTime:    time.Now(),
 		chainID:      chainID,
 		logger:       logger,
 		eventManager: NewEventManager(),
@@ -42,6 +46,11 @@ func (ctx *PulsarContext) MultiStore() types.MultiStore {
 // BlockHeight returns the current block height
 func (ctx *PulsarContext) BlockHeight() int64 {
 	return ctx.blockHeight
+}
+
+// BlockTime returns the current block time
+func (ctx *PulsarContext) BlockTime() time.Time {
+	return ctx.blockTime
 }
 
 // ChainID returns the chain ID

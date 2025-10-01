@@ -7,6 +7,12 @@ type Msg interface {
 
 	// GetSigners returns the addresses that must sign the transaction
 	GetSigners() []string
+
+	// Route returns the route for the message
+	Route() string
+
+	// Type returns the type of the message
+	Type() string
 }
 
 // Event represents a blockchain event

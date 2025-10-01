@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"github.com/b2network/pulsar/store/types"
 )
 
@@ -67,6 +69,9 @@ type Context interface {
 
 	// BlockHeight returns the current block height
 	BlockHeight() int64
+
+	// BlockTime returns the current block time
+	BlockTime() time.Time
 
 	// ChainID returns the chain ID
 	ChainID() string
@@ -155,10 +160,12 @@ type ValidatorSet interface {
 // Validator defines the validator interface
 type Validator interface {
 	GetOperator() []byte
+	GetOperatorAddress() string
 	GetPubKey() []byte
 	GetTokens() int64
 	GetStatus() int32
 	IsJailed() bool
+	GetCommission() float64
 }
 
 // Delegation defines the delegation interface
@@ -204,6 +211,32 @@ type Coin struct {
 // Coins represents a collection of coins
 type Coins []Coin
 
+// Add adds coins to the collection
+func (coins Coins) Add(coinsB ...Coin) Coins {
+	result := make(Coins, len(coins))
+	copy(result, coins)
+
+	for _, coin := range coinsB {
+		result = result.add(coin)
+	}
+
+	return result
+}
+
+// add adds a single coin to the collection
+func (coins Coins) add(coin Coin) Coins {
+	for i, existingCoin := range coins {
+		if existingCoin.Denom == coin.Denom {
+			// Add amounts together
+			coins[i].Amount = existingCoin.Amount + coin.Amount
+			return coins
+		}
+	}
+
+	// Add new coin if denomination not found
+	return append(coins, coin)
+}
+
 // Distribution defines expected interface for distribution operations
 type DistributionKeeper interface {
 	AllocateTokensToValidator(ctx Context, val Validator, tokens int64)
@@ -243,4 +276,10 @@ type Vote interface {
 type VoteOption struct {
 	Option int32  `json:"option"`
 	Weight string `json:"weight"`
+}
+
+// FeePool defines the fee pool interface for distribution
+type FeePool interface {
+	GetCommunityPool() Coins
+	SetCommunityPool(Coins)
 }

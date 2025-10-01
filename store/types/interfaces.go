@@ -246,3 +246,27 @@ type Batch interface {
 	WriteSync() error
 	Close() error
 }
+
+// KVStorePrefixIterator creates an iterator that iterates over all keys with a given prefix
+func KVStorePrefixIterator(store KVStore, prefix []byte) Iterator {
+	return store.Iterator(prefix, PrefixEndBytes(prefix))
+}
+
+// PrefixEndBytes returns the end bytes for a prefix
+func PrefixEndBytes(prefix []byte) []byte {
+	if len(prefix) == 0 {
+		return nil
+	}
+
+	end := make([]byte, len(prefix))
+	copy(end, prefix)
+
+	for i := len(end) - 1; i >= 0; i-- {
+		if end[i] < 0xff {
+			end[i]++
+			return end[:i+1]
+		}
+	}
+
+	return nil
+}
