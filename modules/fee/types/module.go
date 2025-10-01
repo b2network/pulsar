@@ -40,6 +40,9 @@ var (
 
 	// CollectedFeesKey is the key for collected fees storage
 	CollectedFeesKey = []byte("collected_fees")
+
+	// FeeDistributionConfigKey is the key for fee distribution configuration
+	FeeDistributionConfigKey = []byte("fee_distribution_config")
 )
 
 // GetFeeDenomKey returns the store key for a specific fee denomination

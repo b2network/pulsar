@@ -313,3 +313,9 @@ func (gpo *GasPriceOracle) GetSlowGasPrice(ctx keepertypes.Context, denom string
 	return feeDenom.MinGasPrice, nil
 }
 
+// ShouldUpdateGasPrices determines if gas prices should be updated
+func (k Keeper) ShouldUpdateGasPrices(ctx keepertypes.Context) bool {
+	oracle := k.gasPriceOracle.(*GasPriceOracle)
+	return oracle.ShouldUpdateGasPrices(ctx)
+}
+
