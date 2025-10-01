@@ -55,18 +55,29 @@ func DefaultFeeDenoms() []FeeDenom {
 	}
 }
 
-// DefaultModuleGasConfigs returns default module gas configurations
+// DefaultModuleGasConfigs returns default module gas configurations based on standards
 func DefaultModuleGasConfigs() []ModuleGasConfig {
+	// Bank module - handles token transfers
 	bankConfig := NewModuleGasConfig("bank", 15000, true)
 	bankConfig.SetMsgGasRate("MsgSend", 30000)
 	bankConfig.SetMsgGasRate("MsgMultiSend", 50000)
 
+	// Coin module - handles token minting, burning, and metadata
 	coinConfig := NewModuleGasConfig("coin", 20000, true)
 	coinConfig.SetMsgGasRate("MsgMint", 40000)
 	coinConfig.SetMsgGasRate("MsgBurn", 35000)
 	coinConfig.SetMsgGasRate("MsgSetPermissions", 25000)
 	coinConfig.SetMsgGasRate("MsgSetMetadata", 20000)
+	coinConfig.SetMsgGasRate("MsgCreateDenomination", 60000)
+	coinConfig.SetMsgGasRate("MsgUpdateDenomination", 30000)
 
+	// Auth module - handles account management
+	authConfig := NewModuleGasConfig("auth", 5000, true)
+	authConfig.SetMsgGasRate("MsgCreateAccount", 10000)
+	authConfig.SetMsgGasRate("MsgUpdateAccount", 8000)
+	authConfig.SetMsgGasRate("MsgSetAccountParams", 15000)
+
+	// Fee module - handles fee management
 	feeConfig := NewModuleGasConfig("fee", 10000, true)
 	feeConfig.SetMsgGasRate("MsgAddFeeDenom", 15000)
 	feeConfig.SetMsgGasRate("MsgUpdateFeeDenom", 12000)
@@ -75,10 +86,43 @@ func DefaultModuleGasConfigs() []ModuleGasConfig {
 	feeConfig.SetMsgGasRate("MsgUpdateGasFactors", 16000)
 	feeConfig.SetMsgGasRate("MsgSetFeeDistribution", 14000)
 
+	// Staking module - handles validator operations and delegation
+	stakingConfig := NewModuleGasConfig("staking", 25000, true)
+	stakingConfig.SetMsgGasRate("MsgCreateValidator", 100000)
+	stakingConfig.SetMsgGasRate("MsgEditValidator", 30000)
+	stakingConfig.SetMsgGasRate("MsgDelegate", 50000)
+	stakingConfig.SetMsgGasRate("MsgUndelegate", 45000)
+	stakingConfig.SetMsgGasRate("MsgRedelegate", 55000)
+	stakingConfig.SetMsgGasRate("MsgCancelUnbonding", 20000)
+
+	// Distribution module - handles reward distribution
+	distributionConfig := NewModuleGasConfig("distribution", 15000, true)
+	distributionConfig.SetMsgGasRate("MsgWithdrawDelegatorReward", 25000)
+	distributionConfig.SetMsgGasRate("MsgWithdrawValidatorCommission", 20000)
+	distributionConfig.SetMsgGasRate("MsgSetWithdrawAddress", 15000)
+	distributionConfig.SetMsgGasRate("MsgFundCommunityPool", 10000)
+
+	// Government module - handles governance proposals and voting
+	govConfig := NewModuleGasConfig("gov", 30000, true)
+	govConfig.SetMsgGasRate("MsgSubmitProposal", 75000)
+	govConfig.SetMsgGasRate("MsgDeposit", 25000)
+	govConfig.SetMsgGasRate("MsgVote", 30000)
+	govConfig.SetMsgGasRate("MsgVoteWeighted", 40000)
+
+	// Slashing module - handles validator punishment
+	slashingConfig := NewModuleGasConfig("slashing", 20000, true)
+	slashingConfig.SetMsgGasRate("MsgUnjail", 50000)
+	slashingConfig.SetMsgGasRate("MsgUpdateParams", 30000)
+
 	return []ModuleGasConfig{
 		bankConfig,
 		coinConfig,
+		authConfig,
 		feeConfig,
+		stakingConfig,
+		distributionConfig,
+		govConfig,
+		slashingConfig,
 	}
 }
 
