@@ -8,6 +8,7 @@ import (
 
 	bankcli "github.com/b2network/pulsar/modules/bank/client/cli"
 	coincli "github.com/b2network/pulsar/modules/coin/client/cli"
+	feecli "github.com/b2network/pulsar/modules/fee/client/cli"
 	cryptocli "github.com/b2network/pulsar/crypto/client/cli"
 )
 
@@ -50,6 +51,7 @@ It allows you to:
 		keysCmd(),
 		versionCmd(),
 		configCmd(),
+		feecli.GetUtilsCmd(), // Fee utility commands
 	)
 
 	// Add global flags
@@ -75,6 +77,7 @@ func txCmd() *cobra.Command {
 	cmd.AddCommand(
 		bankcli.GetTxCmd(),
 		coincli.GetTxCmd(),
+		feecli.GetTxCmd(),
 		// Future: Add other module tx commands here
 		// stakingcli.GetTxCmd(),
 		// govcli.GetTxCmd(),
@@ -97,6 +100,7 @@ func queryCmd() *cobra.Command {
 	cmd.AddCommand(
 		bankcli.GetQueryCmd(),
 		coincli.GetQueryCmd(),
+		feecli.GetQueryCmd(),
 		// Future: Add other module query commands here
 		// stakingcli.GetQueryCmd(),
 		// govcli.GetQueryCmd(),
