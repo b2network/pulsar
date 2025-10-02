@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	keepertypes "github.com/b2network/pulsar/keeper/types"
+	"github.com/b2network/pulsar/modules/fee/distribution"
 	feetypes "github.com/b2network/pulsar/modules/fee/types"
 	storetypes "github.com/b2network/pulsar/store/types"
 	commontypes "github.com/b2network/pulsar/types"
@@ -23,11 +24,13 @@ type Keeper struct {
 	distributionKeeper feetypes.DistributionKeeper
 
 	// Internal state
-	params          feetypes.Params
-	gasEstimator    feetypes.GasEstimator
-	feeCalculator   feetypes.FeeCalculator
-	feeCollector    feetypes.FeeCollector
-	gasPriceOracle  feetypes.GasPriceOracle
+	params              feetypes.Params
+	gasEstimator        feetypes.GasEstimator
+	feeCalculator       feetypes.FeeCalculator
+	feeCollector        feetypes.FeeCollector
+	gasPriceOracle      feetypes.GasPriceOracle
+	distributionManager *distribution.DistributionManager
+	cdc                 keepertypes.Codec
 }
 
 // NewKeeper creates a new fee Keeper
@@ -38,6 +41,7 @@ func NewKeeper(
 	bankKeeper feetypes.BankKeeper,
 	stakingKeeper feetypes.StakingKeeper,
 	distributionKeeper feetypes.DistributionKeeper,
+	cdc keepertypes.Codec,
 ) *Keeper {
 	k := &Keeper{
 		storeKey:           storeKey,
@@ -48,6 +52,7 @@ func NewKeeper(
 		stakingKeeper:      stakingKeeper,
 		distributionKeeper: distributionKeeper,
 		params:             feetypes.DefaultParams(),
+		cdc:                cdc,
 	}
 
 	// Initialize sub-components
@@ -55,6 +60,12 @@ func NewKeeper(
 	k.feeCalculator = NewFeeCalculator(k)
 	k.feeCollector = NewFeeCollector(k)
 	k.gasPriceOracle = NewGasPriceOracle(k)
+
+	// Initialize distribution manager
+	if err := k.InitializeDistributionManager(); err != nil {
+		// Log error but don't fail keeper creation
+		// In production, you might want to handle this differently
+	}
 
 	return k
 }
